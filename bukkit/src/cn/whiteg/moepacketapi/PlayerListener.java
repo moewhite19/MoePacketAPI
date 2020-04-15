@@ -1,7 +1,6 @@
 package cn.whiteg.moepacketapi;
 
-import cn.whiteg.moepacketapi.api.packet.PacketEvent;
-import cn.whiteg.moepacketapi.api.packet.PacketHandler;
+import cn.whiteg.moepacketapi.api.event.PacketEvent;
 import cn.whiteg.moepacketapi.utils.Reflection;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.channel.Channel;
@@ -44,6 +43,7 @@ public class PlayerListener implements Listener {
         this.removeChannel(e.getPlayer());
     }
 
+
     private void addChannel(final Player p) {
         final Channel channel = Reflection.getChannel(p);
         this.executor.execute(() -> {
@@ -74,37 +74,33 @@ public class PlayerListener implements Listener {
 
         @Override
         public void write(final ChannelHandlerContext ctx,final Object packet,final ChannelPromise promise) throws Exception {
-
-//            if (PacketRefactor.getRefactor().refact(packet,this.p,ctx)){
-//                return;
+//            for (final PacketHandler handler : plugin.getPacketManager().getPacketHandles()) {
+//                try{
+//                    handler.onPacketSending(e);
+//                }catch (Exception ex){
+//                    ex.printStackTrace();
+//                }
 //            }
             PacketEvent e = new PacketEvent(packet,this.p);
-            for (final PacketHandler handler : plugin.getPacketManager().getPacketHandles()) {
-                try{
-                    handler.onPacketSending(e);
-                }catch (Exception ex){
-                    ex.printStackTrace();
-                }
+            if (e.callEvent()){
+                super.write(ctx,e.getPacket(),promise);
             }
-            if (e.isCancelled()) return;
-            super.write(ctx,packet,promise);
         }
 
         @Override
         public void channelRead(final ChannelHandlerContext ctx,final Object packet) throws Exception {
-//            if (PacketRefactor.getRefactor().refact(packet,this.p,ctx)){
-//                return;
+//            for (final PacketHandler handler : plugin.getPacketManager().getPacketHandles()) {
+//                try{
+//                    handler.onPacketReceiving(e);
+//                }catch (Exception ex){
+//                    ex.printStackTrace();
+//                }
 //            }
-            PacketEvent e = new PacketEvent(packet,this.p);
-            for (final PacketHandler handler : plugin.getPacketManager().getPacketHandles()) {
-                try{
-                    handler.onPacketReceiving(e);
-                }catch (Exception ex){
-                    ex.printStackTrace();
-                }
+            PacketEvent event = new PacketEvent(packet,this.p);
+            if (event.callEvent()){
+                super.channelRead(ctx,event.getPacket());
             }
-            if (e.isCancelled()) return;
-            super.channelRead(ctx,packet);
         }
+
     }
 }

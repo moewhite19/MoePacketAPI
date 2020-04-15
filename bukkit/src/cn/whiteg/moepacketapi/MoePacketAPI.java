@@ -1,6 +1,5 @@
 package cn.whiteg.moepacketapi;
 
-import cn.whiteg.moepacketapi.api.PacketManager;
 import cn.whiteg.moepacketapi.utils.Reflection;
 import io.netty.channel.Channel;
 import org.bukkit.Bukkit;
@@ -9,11 +8,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class MoePacketAPI extends JavaPlugin {
     private static MoePacketAPI instance;
-    final private PacketManager packetManager;
+    private PlayerPacketManage playerPacketManage = new PlayerPacketManage();
 
     public MoePacketAPI() {
         MoePacketAPI.instance = this;
-        packetManager = new PacketManager();
     }
 
     public static MoePacketAPI getInstance() {
@@ -33,7 +31,7 @@ public class MoePacketAPI extends JavaPlugin {
         }
     }
 
-    public PacketManager getPacketManager() {
-        return packetManager;
+    public PlayerPacketManage getPlayerPacketManage() {
+        return playerPacketManage;
     }
 }
