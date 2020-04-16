@@ -11,17 +11,21 @@ import java.util.List;
 public class PlayerPacketManage {
     List<Integer> caches = Collections.synchronizedList(new LinkedList<>());
 
+    //向玩家发包
     public void sendPacket(Player player,Object packet) {
         if (player.isOnline() && packet instanceof Packet){
-            ((CraftPlayer) player).getHandle().playerConnection.networkManager.sendPacket((Packet<?>) packet);
             setPluginPacket(packet);
+            ((CraftPlayer) player).getHandle().playerConnection.networkManager.sendPacket((Packet<?>) packet);
         }
     }
 
+    //是否为插件发包
     public boolean isPluginPacket(Object packet) {
         return caches.contains(packet.hashCode());
     }
 
+
+    //设置插件发包
     public void setPluginPacket(Object packet) {
         caches.add(packet.hashCode());
         if (caches.size() > 4) caches.remove(0);

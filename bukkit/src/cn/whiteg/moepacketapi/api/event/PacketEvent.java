@@ -1,5 +1,6 @@
 package cn.whiteg.moepacketapi.api.event;
 
+import cn.whiteg.moepacketapi.MoePacketAPI;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
@@ -101,5 +102,9 @@ public class PacketEvent extends Event implements Cancellable {
             }
         }
         return !isCancelled();
+    }
+
+    public boolean isPluginPacket() {
+        return MoePacketAPI.getInstance().getPlayerPacketManage().isPluginPacket(this);
     }
 }
