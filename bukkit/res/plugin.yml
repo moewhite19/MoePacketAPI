@@ -1,3 +1,5 @@
 name: MoePacketAPI
+api-version: 1.15
+author: MoeWhite
 main: cn.whiteg.moepacketapi.MoePacketAPI
 version: 1.0

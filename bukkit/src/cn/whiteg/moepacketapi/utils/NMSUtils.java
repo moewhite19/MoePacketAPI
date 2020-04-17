@@ -1,6 +1,9 @@
 package cn.whiteg.moepacketapi.utils;
 
+import io.netty.channel.Channel;
 import org.bukkit.Bukkit;
+import org.bukkit.craftbukkit.v1_15_R1.entity.CraftPlayer;
+import org.bukkit.entity.Player;
 
 public class NMSUtils {
     private static final String serverVersion;
@@ -27,5 +30,9 @@ public class NMSUtils {
 
     public static String getServerVersion() {
         return serverVersion;
+    }
+
+    public static Channel getChannel(Player player) {
+        return ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
     }
 }

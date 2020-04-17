@@ -1,5 +1,6 @@
-package cn.whiteg.moepacketapi;
+package cn.whiteg.moepacketapi.hook;
 
+import cn.whiteg.moepacketapi.MoePacketAPI;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
@@ -11,6 +12,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.plugin.Plugin;
@@ -28,7 +30,7 @@ import java.util.logging.Level;
  *
  * @author Kristian
  */
-public abstract class TinyProtocol {
+public abstract class TinyProtocol implements IHook{
     private static final AtomicInteger ID = new AtomicInteger(0);
 
     // Used in order to lookup a channel
@@ -47,7 +49,11 @@ public abstract class TinyProtocol {
 
     // Packets we have to intercept
     private static final Class<?> PACKET_LOGIN_IN_START = ReflectionUtils.getMinecraftClass("PacketLoginInStart");
-    private static final ReflectionUtils.FieldAccessor<GameProfile> getGameProfile = ReflectionUtils.getField(PACKET_LOGIN_IN_START,GameProfile.class,0);
+    // Packets we have to intercept
+    private static final ReflectionUtils.FieldAccessor<GameProfile> loginGetGameProfile = ReflectionUtils.getField(PACKET_LOGIN_IN_START,GameProfile.class,0);
+    private static final Class<?> PACKET_LOGIN_OUT_SUCCESS = ReflectionUtils.getMinecraftClass("PacketLoginOutSuccess");
+    private static final ReflectionUtils.FieldAccessor<GameProfile> loginSuccessGameProfile = ReflectionUtils.getField(PACKET_LOGIN_OUT_SUCCESS,GameProfile.class,0);
+
     // Speedup channel lookup
     private final Map<String, Channel> channelLookup = new MapMaker().weakValues().makeMap();
     // Channels that have already been removed
@@ -57,7 +63,7 @@ public abstract class TinyProtocol {
     // Current handler name
     private final String handlerName;
     protected volatile boolean closed;
-    protected Plugin plugin;
+    protected MoePacketAPI plugin;
     private Listener listener;
     // List of network markers
     private List<Object> networkManagers;
@@ -72,7 +78,7 @@ public abstract class TinyProtocol {
      *
      * @param plugin - the plugin.
      */
-    public TinyProtocol(final Plugin plugin) {
+    public TinyProtocol(final MoePacketAPI plugin) {
         this.plugin = plugin;
 
         // Compute handler name
@@ -102,7 +108,6 @@ public abstract class TinyProtocol {
     private void createServerChannelHandler() {
         // Handle connected channels
         endInitProtocol = new ChannelInitializer<Channel>() {
-
             @Override
             protected void initChannel(Channel channel) throws Exception {
                 try{
@@ -117,29 +122,22 @@ public abstract class TinyProtocol {
                     plugin.getLogger().log(Level.SEVERE,"Cannot inject incomming channel " + channel,e);
                 }
             }
-
         };
-
         // This is executed before Minecraft's channel handler
         beginInitProtocol = new ChannelInitializer<Channel>() {
             @Override
-            protected void initChannel(Channel channel) throws Exception {
+            protected void initChannel(Channel channel) {
                 channel.pipeline().addLast(endInitProtocol);
             }
-
         };
-
         serverChannelHandler = new ChannelInboundHandlerAdapter() {
-
             @Override
-            public void channelRead(ChannelHandlerContext ctx,Object msg) throws Exception {
+            public void channelRead(ChannelHandlerContext ctx,Object msg) {
                 Channel channel = (Channel) msg;
-
                 // Prepare to initialize ths channel
                 channel.pipeline().addFirst(beginInitProtocol);
                 ctx.fireChannelRead(msg);
             }
-
         };
     }
 
@@ -148,17 +146,39 @@ public abstract class TinyProtocol {
      */
     private void registerBukkitEvents() {
         listener = new Listener() {
+//            WeakReference<String> errName = new WeakReference<>(null);
 
             @EventHandler(priority = EventPriority.LOWEST)
             public void onPlayerLogin(PlayerLoginEvent e) {
                 if (closed)
                     return;
+                try{
+                    Channel channel = getChannel(e.getPlayer());
+                    // Don't inject players that have been explicitly uninjected
+                    if (!uninjectedChannels.contains(channel)){
+                        injectPlayer(e.getPlayer(),channel);
+                    }
+                }catch (Exception exception){
+                    if (plugin.getSetting().DEBUG){
+                        plugin.getLogger().warning("玩家登陆时没有注册代理");
+                    }
+                }
+            }
 
-                Channel channel = getChannel(e.getPlayer());
-
-                // Don't inject players that have been explicitly uninjected
-                if (!uninjectedChannels.contains(channel)){
-                    injectPlayer(e.getPlayer());
+            @EventHandler(priority = EventPriority.LOWEST)
+            public void onPlayerLogin(PlayerJoinEvent e) {
+                if (closed)
+                    return;
+                try{
+                    Channel channel = getChannel(e.getPlayer());
+                    // Don't inject players that have been explicitly uninjected
+                    if (!uninjectedChannels.contains(channel)){
+                        injectPlayer(e.getPlayer(),channel);
+                    }
+                }catch (Exception exception){
+                    if (plugin.getSetting().DEBUG){
+                        plugin.getLogger().warning("玩家加入时没有注册代理");
+                    }
                 }
             }
 
@@ -168,8 +188,6 @@ public abstract class TinyProtocol {
                     close();
                 }
             }
-
-
         };
 
         plugin.getServer().getPluginManager().registerEvents(listener,plugin);
@@ -182,6 +200,7 @@ public abstract class TinyProtocol {
         boolean looking = true;
 
         // We need to synchronize against this list
+//        networkManagers = (List<Object>) getNetworkMarkers.invoke(null,serverConnection);
         try{
             Field f = serverConnectionClass.getDeclaredField("connectedChannels");
             f.setAccessible(true);
@@ -189,7 +208,6 @@ public abstract class TinyProtocol {
         }catch (NoSuchFieldException | IllegalAccessException e){
             e.printStackTrace();
         }
-//        networkManagers = (List<Object>) getNetworkMarkers.invoke(null,serverConnection);
         createServerChannelHandler();
 
         // Find the correct list, or implicitly throw an exception
@@ -337,6 +355,10 @@ public abstract class TinyProtocol {
         injectChannelInternal(getChannel(player)).player = player;
     }
 
+    public void injectPlayer(Player player,Channel channel) {
+        injectChannelInternal(channel).player = player;
+    }
+
     /**
      * Add a custom channel handler to the given channel.
      *
@@ -356,14 +378,12 @@ public abstract class TinyProtocol {
     private PacketInterceptor injectChannelInternal(Channel channel) {
         try{
             PacketInterceptor interceptor = (PacketInterceptor) channel.pipeline().get(handlerName);
-
             // Inject our packet interceptor
             if (interceptor == null){
                 interceptor = new PacketInterceptor();
                 channel.pipeline().addBefore("packet_handler",handlerName,interceptor);
                 uninjectedChannels.remove(channel);
             }
-
             return interceptor;
         }catch (IllegalArgumentException e){
             // Try again
@@ -378,15 +398,14 @@ public abstract class TinyProtocol {
      * @return The Netty channel.
      */
     public Channel getChannel(Player player) {
+//        return channelLookup.computeIfAbsent(player.getName(),(k) -> ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel);
         Channel channel = channelLookup.get(player.getName());
-
         // Lookup channel again
         if (channel == null){
             Object connection = getConnection.get(getPlayerHandle.invoke(player));
             Object manager = getManager.get(connection);
             channelLookup.put(player.getName(),channel = getChannel.get(manager));
         }
-
         return channel;
     }
 
@@ -444,6 +463,7 @@ public abstract class TinyProtocol {
     /**
      * Cease listening for packets. This is called automatically when your plugin is disabled.
      */
+    @Override
     public final void close() {
         if (!closed){
             closed = true;
@@ -452,7 +472,6 @@ public abstract class TinyProtocol {
             for (Player player : plugin.getServer().getOnlinePlayers()) {
                 uninjectPlayer(player);
             }
-
             // Clean up Bukkit
             HandlerList.unregisterAll(listener);
             unregisterChannelHandler();
@@ -472,8 +491,6 @@ public abstract class TinyProtocol {
         public void channelRead(ChannelHandlerContext ctx,Object msg) throws Exception {
             // Intercept channel
             final Channel channel = ctx.channel();
-            handleLoginStart(channel,msg);
-
             try{
                 msg = onPacketInAsync(player,channel,msg);
             }catch (Exception e){
@@ -481,28 +498,57 @@ public abstract class TinyProtocol {
             }
 
             if (msg != null){
+                handleLoginStart(this,channel,msg);
                 super.channelRead(ctx,msg);
             }
         }
 
         @Override
         public void write(ChannelHandlerContext ctx,Object msg,ChannelPromise promise) throws Exception {
+            final Channel channel = ctx.channel();
             try{
                 msg = onPacketOutAsync(player,ctx.channel(),msg);
             }catch (Exception e){
                 plugin.getLogger().log(Level.SEVERE,"Error in onPacketOutAsync().",e);
             }
-
             if (msg != null){
+                handleLoginSuccess(this,channel,msg);
                 super.write(ctx,msg,promise);
             }
         }
 
-        private void handleLoginStart(Channel channel,Object packet) {
+        //
+//        @Override
+//        public void close(ChannelHandlerContext ctx,ChannelPromise promise) throws Exception {
+//            if (player != null){
+//                channelLookup.remove(player.getName());
+//                if (plugin.getSetting().DEBUG){
+//                    plugin.getLogger().info("删除Channel " + ctx.channel().id().toString() + " " + player.getName());
+//                }
+//            }
+//            super.close(ctx,promise);
+//        }
+        private void handleLoginStart(PacketInterceptor ctx,Channel channel,Object packet) {
+            if (player != null) return;
             if (PACKET_LOGIN_IN_START.isInstance(packet)){
-                GameProfile profile = getGameProfile.get(packet);
+                GameProfile profile = loginGetGameProfile.get(packet);
                 channelLookup.put(profile.getName(),channel);
+                if (plugin.getSetting().DEBUG){
+                    plugin.getLogger().info("开始认证，储存Channel " + channel.id().toString() + " " + profile.getName());
+                }
             }
         }
+
+        private void handleLoginSuccess(PacketInterceptor ctx,Channel channel,Object packet) {
+            if (player != null) return;
+            if (PACKET_LOGIN_OUT_SUCCESS.isInstance(packet)){
+                GameProfile profile = loginSuccessGameProfile.get(packet);
+                channelLookup.put(profile.getName(),channel);
+                if (plugin.getSetting().DEBUG){
+                    plugin.getLogger().info("认证完成，储存Channel " + channel.id().toString() + " " + profile.getName());
+                }
+            }
+        }
+
     }
 }
