@@ -4,8 +4,8 @@ import org.bukkit.Bukkit;
 
 public class NMSUtils {
     private static final String serverVersion;
-    private static String craftBukkit;
-    private static String netMinecraftServer;
+    private static final String craftBukkit;
+    private static final String netMinecraftServer;
 
     static {
         String packageName = Bukkit.getServer().getClass().getPackage().getName();
@@ -13,8 +13,8 @@ public class NMSUtils {
     }
 
     static {
-        NMSUtils.craftBukkit = "org.bukkit.craftbukkit." + serverVersion + ".";
-        NMSUtils.netMinecraftServer = "net.minecraft.server." + serverVersion + ".";
+        craftBukkit = "org.bukkit.craftbukkit." + serverVersion + ".";
+        netMinecraftServer = "net.minecraft.server." + serverVersion + ".";
     }
 
     public static String getCraftBukkit() {

@@ -21,13 +21,9 @@ public class Tester extends JavaPlugin implements Listener {
         //新建Hander
         handler = new Listener() {
             @EventHandler
-            public void onPacket(PacketEvent event) {
+            public void onPacket(PacketReceiveEvent event) {
                 Object p = event.getPacket();
-                //服务器像玩家发送区块卸载包
-                if (p instanceof PacketPlayOutUnloadChunk){
-                    //阻止事件，玩家不会收到包
-                    event.setCancelled(true);
-                }else if (p instanceof PacketPlayInChat){ //玩家发送聊天包
+                    if (p instanceof PacketPlayInChat){ //玩家发送聊天包
                     PacketPlayInChat p1 = (PacketPlayInChat) p;
                     String msg = p1.b();
                      //如果开头是"//"
@@ -37,6 +33,15 @@ public class Tester extends JavaPlugin implements Listener {
                     //阻止事件
                     event.setCancelled(true);
                     }
+                }
+            }
+            @EventHandler
+            public void onPacket(PacketSendEvent event) {
+                Object p = event.getPacket();
+                //服务器像玩家发送区块卸载包
+                if (p instanceof PacketPlayOutUnloadChunk){
+                    //阻止事件，玩家不会收到包
+                    event.setCancelled(true);
                 }
             }
         };
