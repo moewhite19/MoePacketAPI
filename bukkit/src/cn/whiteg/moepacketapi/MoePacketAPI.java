@@ -2,10 +2,7 @@ package cn.whiteg.moepacketapi;
 
 import cn.whiteg.moepacketapi.hook.IHook;
 import cn.whiteg.moepacketapi.hook.PlayerListener;
-import cn.whiteg.moepacketapi.hook.TinyProtocolHook;
-import org.bukkit.Bukkit;
-import org.bukkit.event.HandlerList;
-import org.bukkit.event.Listener;
+import cn.whiteg.moepacketapi.hook.TinyProtocol;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class MoePacketAPI extends JavaPlugin {
@@ -31,18 +28,16 @@ public class MoePacketAPI extends JavaPlugin {
 //        new PlayerListener(this);
         setting = new Setting(this);
         try{
-            hook = new TinyProtocolHook(this);
+            hook = new TinyProtocol(this);
         }catch (Exception e){
             getLogger().warning("出现异常使用,兼容模式");
-            PlayerListener playerListener = new PlayerListener(this);
-            Bukkit.getPluginManager().registerEvents(playerListener,this);
+            hook = new PlayerListener(this);
         }
         this.getLogger().info(this.getName() + " 已启用");
     }
 
     public void onDisable() {
         if (hook != null){
-            if (hook instanceof Listener) HandlerList.unregisterAll((Listener) hook);
             hook.close();
         }
     }

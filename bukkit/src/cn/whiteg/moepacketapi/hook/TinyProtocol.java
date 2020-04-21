@@ -1,6 +1,9 @@
 package cn.whiteg.moepacketapi.hook;
 
 import cn.whiteg.moepacketapi.MoePacketAPI;
+import cn.whiteg.moepacketapi.api.event.PacketEvent;
+import cn.whiteg.moepacketapi.api.event.PacketReceiveEvent;
+import cn.whiteg.moepacketapi.api.event.PacketSendEvent;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
@@ -30,7 +33,7 @@ import java.util.logging.Level;
  *
  * @author Kristian
  */
-public abstract class TinyProtocol implements IHook{
+public class TinyProtocol implements IHook {
     private static final AtomicInteger ID = new AtomicInteger(0);
 
     // Used in order to lookup a channel
@@ -268,7 +271,11 @@ public abstract class TinyProtocol implements IHook{
      * @return The packet to send instead, or NULL to cancel the transmission.
      */
     public Object onPacketOutAsync(Player receiver,Channel channel,Object packet) {
-        return packet;
+        PacketSendEvent event = new PacketSendEvent(packet,channel,receiver);
+        if (event.callEvent()){
+            return event.getPacket();
+        }
+        return null;
     }
 
     /**
@@ -282,7 +289,11 @@ public abstract class TinyProtocol implements IHook{
      * @return The packet to recieve instead, or NULL to cancel.
      */
     public Object onPacketInAsync(Player sender,Channel channel,Object packet) {
-        return packet;
+        PacketEvent event = new PacketReceiveEvent(packet,channel,sender);
+        if (event.callEvent()){
+            return event.getPacket();
+        }
+        return null;
     }
 
     /**
@@ -492,13 +503,13 @@ public abstract class TinyProtocol implements IHook{
             // Intercept channel
             final Channel channel = ctx.channel();
             try{
+                handleLoginStart(this,channel,msg);
                 msg = onPacketInAsync(player,channel,msg);
             }catch (Exception e){
                 plugin.getLogger().log(Level.SEVERE,"Error in onPacketInAsync().",e);
             }
 
             if (msg != null){
-                handleLoginStart(this,channel,msg);
                 super.channelRead(ctx,msg);
             }
         }
