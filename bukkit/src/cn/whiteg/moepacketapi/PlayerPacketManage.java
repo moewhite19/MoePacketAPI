@@ -45,7 +45,7 @@ public class PlayerPacketManage {
     //设置插件发包
     public void setPluginPacket(Object packet) {
         caches.add(packet.hashCode());
-        if (caches.size() > 4) caches.remove(0);
+        if (caches.size() > 15) caches.remove(0);
     }
 
     //模拟客户端发包
