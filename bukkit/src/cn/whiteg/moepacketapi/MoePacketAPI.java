@@ -7,12 +7,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class MoePacketAPI extends JavaPlugin {
     private static MoePacketAPI instance;
-    private PlayerPacketManage playerPacketManage = new PlayerPacketManage();
+    final private PlayerPacketManage playerPacketManage;
     private IHook hook;
     private Setting setting;
 
     public MoePacketAPI() {
         MoePacketAPI.instance = this;
+        playerPacketManage = new PlayerPacketManage(this);
     }
 
     public static MoePacketAPI getInstance() {

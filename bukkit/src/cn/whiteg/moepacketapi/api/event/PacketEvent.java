@@ -1,7 +1,6 @@
 package cn.whiteg.moepacketapi.api.event;
 
 import cn.whiteg.moepacketapi.MoePacketAPI;
-import cn.whiteg.moepacketapi.utils.NMSUtils;
 import io.netty.channel.Channel;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;

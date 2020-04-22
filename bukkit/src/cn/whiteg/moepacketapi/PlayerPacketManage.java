@@ -11,8 +11,8 @@ import org.bukkit.entity.Player;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 public class PlayerPacketManage {
     private static Method networkManageRead;
@@ -26,7 +26,14 @@ public class PlayerPacketManage {
         }
     }
 
-    List<Integer> caches = Collections.synchronizedList(new LinkedList<>());
+    private final MoePacketAPI plugin;
+
+    private final Set<Integer> cache = Collections.newSetFromMap(new WeakHashMap<>());
+
+    PlayerPacketManage(MoePacketAPI plugin) {
+        this.plugin = plugin;
+
+    }
 
     //向玩家发包
     public void sendPacket(Player player,Object packet) {
@@ -38,17 +45,22 @@ public class PlayerPacketManage {
 
     //是否为插件发包
     public boolean isPluginPacket(Object packet) {
-        return caches.contains(packet.hashCode());
+        synchronized (cache) {
+            return cache.contains(packet.hashCode());
+        }
     }
 
 
     //设置插件发包
     public void setPluginPacket(Object packet) {
-        caches.add(packet.hashCode());
-        if (caches.size() > 15) caches.remove(0);
+        synchronized (cache) {
+            cache.add(packet.hashCode());
+        }
+//        caches.add(packet.hashCode());
+//        if (caches.size() > 15) caches.remove(0);
     }
 
-    //模拟客户端发包
+    //模拟服务端收包
     public void recieveClientPacket(Channel channel,Object packet) {
         ChannelHandler h = channel.pipeline().get("packet_handler");
         try{
