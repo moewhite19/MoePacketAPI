@@ -13,7 +13,7 @@ public class MoePacketAPI extends JavaPlugin {
 
     public MoePacketAPI() {
         MoePacketAPI.instance = this;
-        playerPacketManage = new PlayerPacketManage(this);
+        playerPacketManage = new PlayerPacketManage();
     }
 
     public static MoePacketAPI getInstance() {

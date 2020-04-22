@@ -26,13 +26,9 @@ public class PlayerPacketManage {
         }
     }
 
-    private final MoePacketAPI plugin;
-
     private final Set<Integer> cache = Collections.newSetFromMap(new WeakHashMap<>());
 
-    PlayerPacketManage(MoePacketAPI plugin) {
-        this.plugin = plugin;
-
+    PlayerPacketManage() {
     }
 
     //向玩家发包
