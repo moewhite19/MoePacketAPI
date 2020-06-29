@@ -3,10 +3,7 @@ package cn.whiteg.moepacketapi;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.server.v1_16_R1.NetworkManager;
-import net.minecraft.server.v1_16_R1.Packet;
-import net.minecraft.server.v1_16_R1.PacketListener;
-import net.minecraft.server.v1_16_R1.PlayerConnection;
+import net.minecraft.server.v1_16_R1.*;
 import org.bukkit.craftbukkit.v1_16_R1.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
@@ -89,6 +86,12 @@ public class PlayerPacketManage {
         return null;
     }
 
+    public NetworkManager getNetworkManage(Player player) {
+        EntityPlayer np = ((CraftPlayer) player).getHandle();
+        return np.networkManager;
+    }
+
+
     public Player getPlayer(Channel channel) {
         return getPlayer(getNetworkManage(channel));
     }
@@ -104,6 +107,10 @@ public class PlayerPacketManage {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public Channel getChannel(Player player) {
+        return getNetworkManage(player).channel;
     }
 
     public Set<Integer> getCache() {
