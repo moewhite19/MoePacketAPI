@@ -2,7 +2,7 @@ package cn.whiteg.moepacketapi.utils;
 
 import io.netty.channel.Channel;
 import org.bukkit.Bukkit;
-import org.bukkit.craftbukkit.v1_15_R1.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_16_R1.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 public class NMSUtils {

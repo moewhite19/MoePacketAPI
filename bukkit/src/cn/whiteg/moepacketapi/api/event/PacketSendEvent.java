@@ -1,11 +1,12 @@
 package cn.whiteg.moepacketapi.api.event;
 
-import io.netty.channel.Channel;
-import org.bukkit.entity.Player;
+import cn.whiteg.moepacketapi.hook.PlayerPacketHook;
+import cn.whiteg.moepacketapi.hook.TinyProtocol;
+import io.netty.channel.ChannelHandlerContext;
 
 public class PacketSendEvent extends PacketEvent {
 
-    public PacketSendEvent(final Object packet,Channel channel,final Player p) {
-        super(packet,channel,p);
+    public PacketSendEvent(final Object packet,ChannelHandlerContext channel,PlayerPacketHook packetHook) {
+        super(packet,channel,packetHook);
     }
 }

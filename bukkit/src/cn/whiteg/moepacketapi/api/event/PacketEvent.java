@@ -1,7 +1,10 @@
 package cn.whiteg.moepacketapi.api.event;
 
 import cn.whiteg.moepacketapi.MoePacketAPI;
+import cn.whiteg.moepacketapi.hook.PlayerPacketHook;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import net.minecraft.server.v1_16_R1.NetworkManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -13,17 +16,17 @@ import java.lang.reflect.Modifier;
 
 public class PacketEvent extends Event implements Cancellable {
     final private static HandlerList handlers = new HandlerList();
-    private final Channel channel;
+    private final ChannelHandlerContext channel;
+    private final PlayerPacketHook handel;
     private Object packet;
-    private Player player;
     private boolean cancelled;
 
 
-    public PacketEvent(final Object packet,Channel channel,Player p) {
+    public PacketEvent(final Object packet,ChannelHandlerContext channel,PlayerPacketHook p) {
         super(true);
         this.channel = channel;
         this.packet = packet;
-        this.player = p;
+        this.handel = p;
     }
 
     public static HandlerList getHandlerList() {
@@ -43,9 +46,21 @@ public class PacketEvent extends Event implements Cancellable {
     }
 
     public Player getPlayer() {
-        if (MoePacketAPI.getInstance().getSetting().DEBUG && player == null)
-            MoePacketAPI.getInstance().getLogger().warning("Player值为 Null");
-        return this.player;
+        Player player = handel.getPlayer();
+        if (player == null){
+            player = MoePacketAPI.getInstance().getPlayerPacketManage().getPlayer(getNetworkManage());
+            handel.setPlayer(player);
+        }
+        return player;
+    }
+
+    public NetworkManager getNetworkManage() {
+        NetworkManager network = handel.getNetworkManager();
+        if (network == null){
+            network = MoePacketAPI.getInstance().getPlayerPacketManage().getNetworkManage(getChannel());
+            handel.setNetworkManager(network);
+        }
+        return network;
     }
 
     public Object getField(final String name) {
@@ -85,6 +100,10 @@ public class PacketEvent extends Event implements Cancellable {
     }
 
     public Channel getChannel() {
+        return channel.channel();
+    }
+
+    public ChannelHandlerContext getChannelHandleContext() {
         return channel;
     }
 

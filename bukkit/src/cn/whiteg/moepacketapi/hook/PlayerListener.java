@@ -9,6 +9,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import net.minecraft.server.v1_16_R1.NetworkManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -75,9 +76,10 @@ public class PlayerListener implements Listener, IHook {
         HandlerList.unregisterAll(this);
     }
 
-    public class PlayerChannel extends ChannelDuplexHandler {
+    public class PlayerChannel extends ChannelDuplexHandler implements PlayerPacketHook {
         private volatile Player player;
         private Channel channel;
+        private NetworkManager networkManager;
 
         public PlayerChannel(Player p,Channel channel) {
             this.player = p;
@@ -86,7 +88,7 @@ public class PlayerListener implements Listener, IHook {
 
         @Override
         public void write(final ChannelHandlerContext ctx,final Object packet,final ChannelPromise promise) throws Exception {
-            PacketSendEvent e = new PacketSendEvent(packet,channel,player);
+            PacketSendEvent e = new PacketSendEvent(packet,ctx,this);
             if (e.callEvent()){
                 super.write(ctx,e.getPacket(),promise);
             }
@@ -94,16 +96,28 @@ public class PlayerListener implements Listener, IHook {
 
         @Override
         public void channelRead(final ChannelHandlerContext ctx,final Object packet) throws Exception {
-            PacketReceiveEvent e = new PacketReceiveEvent(packet,channel,player);
+            PacketReceiveEvent e = new PacketReceiveEvent(packet,ctx,this);
             if (e.callEvent()){
                 super.channelRead(ctx,e.getPacket());
             }
         }
 
+        @Override
+        public void setNetworkManager(NetworkManager networkManager) {
+            this.networkManager = networkManager;
+        }
+
+        @Override
+        public NetworkManager getNetworkManager() {
+            return networkManager;
+        }
+
+        @Override
         public Player getPlayer() {
             return player;
         }
 
+        @Override
         public void setPlayer(Player player) {
             this.player = player;
         }
