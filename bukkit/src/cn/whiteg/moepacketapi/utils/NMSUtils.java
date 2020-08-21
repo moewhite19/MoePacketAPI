@@ -1,8 +1,12 @@
 package cn.whiteg.moepacketapi.utils;
 
 import io.netty.channel.Channel;
+import net.minecraft.server.v1_16_R2.WorldServer;
 import org.bukkit.Bukkit;
-import org.bukkit.craftbukkit.v1_16_R1.entity.CraftPlayer;
+import org.bukkit.World;
+import org.bukkit.craftbukkit.v1_16_R2.CraftWorld;
+import org.bukkit.craftbukkit.v1_16_R2.entity.CraftPlayer;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 public class NMSUtils {
@@ -34,5 +38,11 @@ public class NMSUtils {
 
     public static Channel getChannel(Player player) {
         return ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
+    }
+
+    public static Entity getEntityById(World world,int id) {
+        WorldServer worldServer = ((CraftWorld) world).getHandle();
+        net.minecraft.server.v1_16_R2.Entity entity = worldServer.getEntity(id);
+        return entity == null ? null : entity.getBukkitEntity();
     }
 }

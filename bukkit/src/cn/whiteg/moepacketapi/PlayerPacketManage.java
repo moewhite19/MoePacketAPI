@@ -3,8 +3,8 @@ package cn.whiteg.moepacketapi;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.server.v1_16_R1.*;
-import org.bukkit.craftbukkit.v1_16_R1.entity.CraftPlayer;
+import net.minecraft.server.v1_16_R2.*;
+import org.bukkit.craftbukkit.v1_16_R2.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;
@@ -59,24 +59,24 @@ public class PlayerPacketManage {
 
     //模拟服务端收包
     public void recieveClientPacket(Channel channel,Object packet) {
-        if (!channel.isOpen()) return;
-        ChannelHandler h = channel.pipeline().get("packet_handler");
+        recieveClientPacket(getNetworkManage(channel),packet);
+    }
+
+    public void recieveClientPacket(NetworkManager networkManager,Object packet) {
+        if (!networkManager.isConnected()) return;
         try{
-            networkManageRead.invoke(h,channel.pipeline().lastContext(),packet);
-            setPluginPacket(packet);
+            networkManageRead.invoke(networkManager,networkManager.channel.pipeline().lastContext(),packet);
         }catch (IllegalAccessException | InvocationTargetException e){
             e.printStackTrace();
         }
-
         //另一种实现方式
-        // if (!ctx.channel().isOpen()) return;
-        //        NetworkManager networkManager = (NetworkManager) ctx.pipeline().get("packet_handler");
-        //        try{
-        //            networkManager.channelRead(ctx,packet);
-        //            setPluginPacket(packet);
-        //        }catch (Exception e){
-        //            e.printStacrkTrace();
-        //        }
+        /*
+        try{
+            networkManager.channelRead(networkManager.channel.pipeline().lastContext(),packet);
+            setPluginPacket(packet);
+        }catch (Exception e){
+            e.printStackTrace();
+        }*/
 
     }
 
@@ -88,7 +88,7 @@ public class PlayerPacketManage {
 
     public NetworkManager getNetworkManage(Player player) {
         EntityPlayer np = ((CraftPlayer) player).getHandle();
-        return np.networkManager;
+        return np.playerConnection.networkManager;
     }
 
 

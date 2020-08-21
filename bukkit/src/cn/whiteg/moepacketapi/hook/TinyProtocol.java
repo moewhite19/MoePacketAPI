@@ -2,11 +2,11 @@ package cn.whiteg.moepacketapi.hook;
 
 import cn.whiteg.moepacketapi.MoePacketAPI;
 import cn.whiteg.moepacketapi.api.event.PacketReceiveEvent;
+import cn.whiteg.moepacketapi.api.event.PacketSendEvent;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
-import com.mojang.authlib.GameProfile;
 import io.netty.channel.*;
-import net.minecraft.server.v1_16_R1.NetworkManager;
+import net.minecraft.server.v1_16_R2.NetworkManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -42,12 +42,6 @@ public class TinyProtocol implements IHook {
     private static final ReflectionUtils.FieldAccessor<Object> getMinecraftServer = ReflectionUtils.getField("{obc}.CraftServer",minecraftServerClass,0);
     private static final ReflectionUtils.FieldAccessor<Object> getServerConnection = ReflectionUtils.getField(minecraftServerClass,serverConnectionClass,0);
 
-    // Packets we have to intercept
-    private static final Class<?> PACKET_LOGIN_IN_START = ReflectionUtils.getMinecraftClass("PacketLoginInStart");
-    // Packets we have to intercept
-    private static final ReflectionUtils.FieldAccessor<GameProfile> loginGetGameProfile = ReflectionUtils.getField(PACKET_LOGIN_IN_START,GameProfile.class,0);
-    private static final Class<?> PACKET_LOGIN_OUT_SUCCESS = ReflectionUtils.getMinecraftClass("PacketLoginOutSuccess");
-    private static final ReflectionUtils.FieldAccessor<GameProfile> loginSuccessGameProfile = ReflectionUtils.getField(PACKET_LOGIN_OUT_SUCCESS,GameProfile.class,0);
     // Injected channel handlers
     private final List<Channel> serverChannels = Lists.newArrayList();
     // Current handler name
@@ -290,7 +284,7 @@ public class TinyProtocol implements IHook {
 
         @Override
         public void write(ChannelHandlerContext ctx,Object msg,ChannelPromise promise) throws Exception {
-            PacketReceiveEvent event = new PacketReceiveEvent(msg,ctx,this);
+            PacketSendEvent event = new PacketSendEvent(msg,ctx,this);
             event.callEvent();
             if (event.isCancelled()) return;
             super.write(ctx,event.getPacket(),promise);

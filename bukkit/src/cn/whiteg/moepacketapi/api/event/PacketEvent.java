@@ -4,7 +4,7 @@ import cn.whiteg.moepacketapi.MoePacketAPI;
 import cn.whiteg.moepacketapi.hook.PlayerPacketHook;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.server.v1_16_R1.NetworkManager;
+import net.minecraft.server.v1_16_R2.NetworkManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
