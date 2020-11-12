@@ -6,7 +6,7 @@ import cn.whiteg.moepacketapi.api.event.PacketSendEvent;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
 import io.netty.channel.*;
-import net.minecraft.server.v1_16_R2.NetworkManager;
+import net.minecraft.server.v1_16_R3.NetworkManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;

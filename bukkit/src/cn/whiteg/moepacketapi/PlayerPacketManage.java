@@ -3,12 +3,11 @@ package cn.whiteg.moepacketapi;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.server.v1_16_R2.*;
-import org.bukkit.craftbukkit.v1_16_R2.entity.CraftPlayer;
+import net.minecraft.server.v1_16_R3.*;
+import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Set;
@@ -59,25 +58,32 @@ public class PlayerPacketManage {
 
     //模拟服务端收包
     public void recieveClientPacket(Channel channel,Object packet) {
-        recieveClientPacket(getNetworkManage(channel),packet);
+        NetworkManager network = getNetworkManage(channel);
+        if (network == null) return;
+        recieveClientPacket(network,(packet));
     }
 
+    //服务端收包事件
     public void recieveClientPacket(NetworkManager networkManager,Object packet) {
+        if (networkManager instanceof PacketListenerPlayIn && packet instanceof Packet){
+            recieveClientPacket(((PacketListenerPlayIn) networkManager),((Packet<PacketListenerPlayIn>) packet));
+        } else {
+            recieveClientPacket(networkManager,networkManager.channel.pipeline().lastContext(),packet);
+        }
+    }
+
+    public void recieveClientPacket(NetworkManager networkManager,ChannelHandlerContext ctx,Object packet) {
         if (!networkManager.isConnected()) return;
         try{
-            networkManageRead.invoke(networkManager,networkManager.channel.pipeline().lastContext(),packet);
-        }catch (IllegalAccessException | InvocationTargetException e){
-            e.printStackTrace();
-        }
-        //另一种实现方式
-        /*
-        try{
-            networkManager.channelRead(networkManager.channel.pipeline().lastContext(),packet);
-            setPluginPacket(packet);
+            networkManager.channelRead(ctx,packet);
         }catch (Exception e){
-            e.printStackTrace();
-        }*/
+            throw new IllegalStateException("发包错误");
+        }
+    }
 
+    //服务端收包事件
+    public void recieveClientPacket(PacketListenerPlayIn networkManager,Packet<PacketListenerPlayIn> packet) {
+        packet.a(networkManager);
     }
 
     public NetworkManager getNetworkManage(Channel channel) {
