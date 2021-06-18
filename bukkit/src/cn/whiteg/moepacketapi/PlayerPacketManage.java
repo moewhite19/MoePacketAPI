@@ -1,10 +1,16 @@
 package cn.whiteg.moepacketapi;
 
+import cn.whiteg.moepacketapi.utils.EntityNetUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.PacketListener;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.PacketListenerPlayIn;
+import net.minecraft.server.level.EntityPlayer;
+import net.minecraft.server.network.PlayerConnection;
+import org.bukkit.craftbukkit.v1_17_R1.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;
@@ -21,9 +27,14 @@ public class PlayerPacketManage {
         try{
             networkManageRead = NetworkManager.class.getDeclaredMethod("channelRead0",ChannelHandlerContext.class,Packet.class);
             networkManageRead.setAccessible(true);
-            packetListener = NetworkManager.class.getDeclaredField("packetListener");
-            packetListener.setAccessible(true);
-        }catch (NoSuchMethodException | NoSuchFieldException e){
+//            packetListener = NetworkManager.class.getDeclaredField("m");
+            for (Field declaredField : NetworkManager.class.getDeclaredFields()) {
+                if (declaredField.getType().equals(PacketListener.class)){
+                    packetListener = declaredField;
+                    packetListener.setAccessible(true);
+                }
+            }
+        }catch (NoSuchMethodException e){
             e.printStackTrace();
         }
     }
@@ -34,15 +45,15 @@ public class PlayerPacketManage {
     }
 
     //向玩家发包
-    public void sendPacket(Player player,Object packet) {
-        if (player.isOnline() && packet instanceof Packet){
+    public void sendPacket(Player player,Packet<?> packet) {
+        if (player.isOnline() && packet != null){
             setPluginPacket(packet);
-            ((CraftPlayer) player).getHandle().playerConnection.networkManager.sendPacket((Packet<?>) packet);
+            getNetworkManage(player).sendPacket(packet);
         }
     }
 
     //是否为插件发包
-    public boolean isPluginPacket(Object packet) {
+    public boolean isPluginPacket(Packet<?> packet) {
         synchronized (cache) {
             return cache.contains(packet.hashCode());
         }
@@ -50,29 +61,29 @@ public class PlayerPacketManage {
 
 
     //设置插件发包
-    public void setPluginPacket(Object packet) {
+    public void setPluginPacket(Packet<?> packet) {
         synchronized (cache) {
             cache.add(packet.hashCode());
         }
     }
 
     //模拟服务端收包
-    public void recieveClientPacket(Channel channel,Object packet) {
+    public void recieveClientPacket(Channel channel,Packet<?> packet) {
         NetworkManager network = getNetworkManage(channel);
         if (network == null) return;
         recieveClientPacket(network,(packet));
     }
 
     //服务端收包事件
-    public void recieveClientPacket(NetworkManager networkManager,Object packet) {
-        if (networkManager instanceof PacketListenerPlayIn && packet instanceof Packet){
+    public void recieveClientPacket(NetworkManager networkManager,Packet<?> packet) {
+        if (networkManager instanceof PacketListenerPlayIn && packet != null){
             recieveClientPacket(((PacketListenerPlayIn) networkManager),((Packet<PacketListenerPlayIn>) packet));
         } else {
-            recieveClientPacket(networkManager,networkManager.channel.pipeline().lastContext(),packet);
+            recieveClientPacket(networkManager,networkManager.k.pipeline().lastContext(),packet);
         }
     }
 
-    public void recieveClientPacket(NetworkManager networkManager,ChannelHandlerContext ctx,Object packet) {
+    public void recieveClientPacket(NetworkManager networkManager,ChannelHandlerContext ctx,Packet<?> packet) {
         if (!networkManager.isConnected()) return;
         try{
             networkManager.channelRead(ctx,packet);
@@ -83,7 +94,7 @@ public class PlayerPacketManage {
 
     //服务端收包事件
     public void recieveClientPacket(PacketListenerPlayIn networkManager,Packet<PacketListenerPlayIn> packet) {
-        packet.a(networkManager);
+        packet.handle(networkManager);
     }
 
     public NetworkManager getNetworkManage(Channel channel) {
@@ -94,7 +105,7 @@ public class PlayerPacketManage {
 
     public NetworkManager getNetworkManage(Player player) {
         EntityPlayer np = ((CraftPlayer) player).getHandle();
-        return np.playerConnection.networkManager;
+        return EntityNetUtils.getNetWork(EntityNetUtils.getPlayerConnection(np));
     }
 
 
@@ -107,7 +118,7 @@ public class PlayerPacketManage {
         try{
             PacketListener listener = (PacketListener) packetListener.get(network);
             if (listener instanceof PlayerConnection){
-                return ((PlayerConnection) listener).player.getBukkitEntity();
+                return ((PlayerConnection) listener).b.getBukkitEntity();
             }
         }catch (IllegalAccessException e){
             e.printStackTrace();
@@ -116,7 +127,7 @@ public class PlayerPacketManage {
     }
 
     public Channel getChannel(Player player) {
-        return getNetworkManage(player).channel;
+        return getNetworkManage(player).k;
     }
 
     public Set<Integer> getCache() {

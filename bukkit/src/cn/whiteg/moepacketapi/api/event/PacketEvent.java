@@ -4,7 +4,8 @@ import cn.whiteg.moepacketapi.MoePacketAPI;
 import cn.whiteg.moepacketapi.hook.PlayerPacketHook;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.server.v1_16_R3.NetworkManager;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.protocol.Packet;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -18,11 +19,11 @@ public class PacketEvent extends Event implements Cancellable {
     final private static HandlerList handlers = new HandlerList();
     private final ChannelHandlerContext channel;
     private final PlayerPacketHook handel;
-    private Object packet;
+    private Packet<?> packet;
     private boolean cancelled;
 
 
-    public PacketEvent(final Object packet,ChannelHandlerContext channel,PlayerPacketHook p) {
+    public PacketEvent(final Packet<?> packet,ChannelHandlerContext channel,PlayerPacketHook p) {
         super(true);
         this.channel = channel;
         this.packet = packet;
@@ -37,11 +38,11 @@ public class PacketEvent extends Event implements Cancellable {
         return this.packet.getClass().getSimpleName();
     }
 
-    public Object getPacket() {
+    public Packet<?> getPacket() {
         return this.packet;
     }
 
-    public void setPacket(Object packet) {
+    public void setPacket(Packet<?> packet) {
         this.packet = packet;
     }
 
@@ -108,6 +109,6 @@ public class PacketEvent extends Event implements Cancellable {
     }
 
     public boolean isPluginPacket() {
-        return MoePacketAPI.getInstance().getPlayerPacketManage().isPluginPacket(this);
+        return MoePacketAPI.getInstance().getPlayerPacketManage().isPluginPacket(this.getPacket());
     }
 }

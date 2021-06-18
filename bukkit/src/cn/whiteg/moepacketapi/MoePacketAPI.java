@@ -30,6 +30,7 @@ public class MoePacketAPI extends JavaPlugin {
             hook = new TinyProtocol(this);
         }catch (Exception e){
             getLogger().warning("出现异常");
+            e.printStackTrace();
 //            getLogger().warning("出现异常使用,兼容模式");
 //            hook = new PlayerListener(this);
         }

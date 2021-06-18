@@ -6,13 +6,16 @@ import cn.whiteg.moepacketapi.api.event.PacketSendEvent;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
 import io.netty.channel.*;
-import net.minecraft.server.v1_16_R3.NetworkManager;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.level.EntityPlayer;
+import net.minecraft.server.network.PlayerConnection;
+import net.minecraft.server.network.ServerConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.bukkit.event.server.PluginDisableEvent;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -32,15 +35,14 @@ public class TinyProtocol implements IHook {
 
     // Used in order to lookup a channel
     private static final ReflectionUtils.MethodInvoker getPlayerHandle = ReflectionUtils.getMethod("{obc}.entity.CraftPlayer","getHandle");
-    private static final ReflectionUtils.FieldAccessor<Object> getConnection = ReflectionUtils.getField("{nms}.EntityPlayer","playerConnection",Object.class);
-    private static final ReflectionUtils.FieldAccessor<Object> getManager = ReflectionUtils.getField("{nms}.PlayerConnection","networkManager",Object.class);
-    private static final ReflectionUtils.FieldAccessor<Channel> getChannel = ReflectionUtils.getField("{nms}.NetworkManager",Channel.class,0);
+    private static final ReflectionUtils.FieldAccessor<PlayerConnection> getConnection = ReflectionUtils.getFieldFormType(EntityPlayer.class,PlayerConnection.class);
+    private static final ReflectionUtils.FieldAccessor<NetworkManager> getManager = ReflectionUtils.getFieldFormType(PlayerConnection.class,NetworkManager.class);
+    private static final ReflectionUtils.FieldAccessor<Channel> getChannel = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
 
     // Looking up ServerConnection
-    private static final Class<Object> minecraftServerClass = ReflectionUtils.getUntypedClass("{nms}.MinecraftServer");
-    private static final Class<Object> serverConnectionClass = ReflectionUtils.getUntypedClass("{nms}.ServerConnection");
-    private static final ReflectionUtils.FieldAccessor<Object> getMinecraftServer = ReflectionUtils.getField("{obc}.CraftServer",minecraftServerClass,0);
-    private static final ReflectionUtils.FieldAccessor<Object> getServerConnection = ReflectionUtils.getField(minecraftServerClass,serverConnectionClass,0);
+    private static final Class<Object> craftServerClass = ReflectionUtils.getUntypedClass("{obc}.CraftServer");
+    private static final ReflectionUtils.FieldAccessor<DedicatedServer> getMinecraftServer = ReflectionUtils.getFieldFormType(craftServerClass,DedicatedServer.class);
+    private static final ReflectionUtils.FieldAccessor<ServerConnection> getServerConnection = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnection.class);
 
     // Injected channel handlers
     private final List<Channel> serverChannels = Lists.newArrayList();
@@ -67,9 +69,6 @@ public class TinyProtocol implements IHook {
 
         // Compute handler name
         this.handlerName = "tiny-" + plugin.getName() + "-" + ID.incrementAndGet();
-
-        // Prepare existing players
-        registerBukkitEvents();
         try{
             registerChannelHandler();
         }catch (IllegalArgumentException ex){
@@ -83,6 +82,7 @@ public class TinyProtocol implements IHook {
     private void createServerChannelHandler() {
         // Handle connected channels
         endInitProtocol = new ChannelInitializer<Channel>() {
+            @SuppressWarnings("SynchronizeOnNonFinalField")
             @Override
             protected void initChannel(Channel channel) throws Exception {
                 try{
@@ -118,45 +118,31 @@ public class TinyProtocol implements IHook {
         };
     }
 
-    /**
-     * Register bukkit events.
-     */
-    private void registerBukkitEvents() {
-        listener = new Listener() {
-            @EventHandler
-            public void onPluginDisable(PluginDisableEvent e) {
-                if (e.getPlugin().equals(plugin)){
-                    close();
-                }
-            }
-        };
-        plugin.getServer().getPluginManager().registerEvents(listener,plugin);
-    }
-
     @SuppressWarnings("unchecked")
     private void registerChannelHandler() {
         Object mcServer = getMinecraftServer.get(Bukkit.getServer());
         Object serverConnection = getServerConnection.get(mcServer);
         boolean looking = true;
         try{
-            Field f = serverConnectionClass.getDeclaredField("connectedChannels");
+            Field f = ReflectionUtils.getFieldFormType(ServerConnection.class,"java.util.List<net.minecraft.network.NetworkManager>");
             f.setAccessible(true);
             networkManagers = (List<Object>) f.get(serverConnection);
-        }catch (NoSuchFieldException | IllegalAccessException e){
+        }catch (IllegalAccessException e){
             e.printStackTrace();
         }
         createServerChannelHandler();
 
         for (int i = 0; looking; i++) {
             List<Object> list = ReflectionUtils.getField(serverConnection.getClass(),List.class,i).get(serverConnection);
-
             for (Object item : list) {
-                if (!ChannelFuture.class.isInstance(item))
+                if (item instanceof ChannelFuture channelFuture){
+                    Channel serverChannel = channelFuture.channel();
+                    serverChannels.add(serverChannel);
+                    serverChannel.pipeline().addFirst(serverChannelHandler);
+                    looking = false;
+                } else {
                     break;
-                Channel serverChannel = ((ChannelFuture) item).channel();
-                serverChannels.add(serverChannel);
-                serverChannel.pipeline().addFirst(serverChannelHandler);
-                looking = false;
+                }
             }
         }
     }
@@ -259,8 +245,6 @@ public class TinyProtocol implements IHook {
     public final void close() {
         if (!closed){
             closed = true;
-            // Clean up Bukkit
-            HandlerList.unregisterAll(listener);
             unregisterChannelHandler();
         }
     }
@@ -270,23 +254,21 @@ public class TinyProtocol implements IHook {
      *
      * @author Kristian
      */
-    public final class PacketInterceptor extends ChannelDuplexHandler implements PlayerPacketHook {
+    public static class PacketInterceptor extends ChannelDuplexHandler implements PlayerPacketHook {
         Player player = null;
         NetworkManager networkManager = null;
 
         @Override
         public void channelRead(ChannelHandlerContext ctx,Object msg) throws Exception {
-            PacketReceiveEvent event = new PacketReceiveEvent(msg,ctx,this);
-            event.callEvent();
-            if (event.isCancelled()) return;
+            PacketReceiveEvent event = new PacketReceiveEvent((Packet<?>) msg,ctx,this);
+            if (!event.callEvent()) return;
             super.channelRead(ctx,event.getPacket());
         }
 
         @Override
         public void write(ChannelHandlerContext ctx,Object msg,ChannelPromise promise) throws Exception {
-            PacketSendEvent event = new PacketSendEvent(msg,ctx,this);
-            event.callEvent();
-            if (event.isCancelled()) return;
+            PacketSendEvent event = new PacketSendEvent((Packet<?>) msg,ctx,this);
+            if (!event.callEvent()) return;
             super.write(ctx,event.getPacket(),promise);
         }
 

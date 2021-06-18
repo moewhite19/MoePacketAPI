@@ -1,6 +1,6 @@
 package cn.whiteg.moepacketapi.hook;
 
-import net.minecraft.server.v1_16_R3.NetworkManager;
+import net.minecraft.network.NetworkManager;
 import org.bukkit.entity.Player;
 
 public interface PlayerPacketHook {
