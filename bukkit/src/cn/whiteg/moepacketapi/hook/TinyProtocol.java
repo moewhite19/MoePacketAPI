@@ -31,8 +31,6 @@ import java.util.logging.Level;
  * @author Kristian
  */
 public class TinyProtocol implements IHook {
-    private static final AtomicInteger ID = new AtomicInteger(0);
-
     // Used in order to lookup a channel
     private static final ReflectionUtils.MethodInvoker getPlayerHandle = ReflectionUtils.getMethod("{obc}.entity.CraftPlayer","getHandle");
     private static final ReflectionUtils.FieldAccessor<PlayerConnection> getConnection = ReflectionUtils.getFieldFormType(EntityPlayer.class,PlayerConnection.class);
@@ -68,7 +66,7 @@ public class TinyProtocol implements IHook {
         this.plugin = plugin;
 
         // Compute handler name
-        this.handlerName = "tiny-" + plugin.getName() + "-" + ID.incrementAndGet();
+        this.handlerName = "tiny-" + plugin.getName();
         try{
             registerChannelHandler();
         }catch (IllegalArgumentException ex){

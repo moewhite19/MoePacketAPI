@@ -108,6 +108,11 @@ public class PlayerPacketManage {
         return EntityNetUtils.getNetWork(EntityNetUtils.getPlayerConnection(np));
     }
 
+    public PlayerConnection getPlayerConnection(Player player) {
+        EntityPlayer np = ((CraftPlayer) player).getHandle();
+        return EntityNetUtils.getPlayerConnection(np);
+    }
+
 
     public Player getPlayer(Channel channel) {
         return getPlayer(getNetworkManage(channel));
