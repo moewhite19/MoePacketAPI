@@ -48,7 +48,6 @@ public class TinyProtocol implements IHook {
     private final String handlerName;
     protected volatile boolean closed;
     protected MoePacketAPI plugin;
-    private Listener listener;
     // List of network markers
     private List<Object> networkManagers;
     private ChannelInboundHandlerAdapter serverChannelHandler;

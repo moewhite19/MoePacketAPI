@@ -44,7 +44,7 @@ public class EntityNetUtils {
     public static Entity getEntityById(World world,int id) {
         try{
             WorldServer nmsWorld = (WorldServer) world.getClass().getMethod("getHandle").invoke(world);
-            var entity = nmsWorld.getEntity(id);
+            var entity = nmsWorld.a(id);
             return entity == null ? null : entity.getBukkitEntity();
         }catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e){
             e.printStackTrace();

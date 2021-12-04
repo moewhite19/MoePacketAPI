@@ -10,7 +10,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.PacketListenerPlayIn;
 import net.minecraft.server.level.EntityPlayer;
 import net.minecraft.server.network.PlayerConnection;
-import org.bukkit.craftbukkit.v1_17_R1.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_18_R1.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;
@@ -24,19 +24,23 @@ public class PlayerPacketManage {
     private static Field packetListener;
 
     static {
-        try{
-            networkManageRead = NetworkManager.class.getDeclaredMethod("channelRead0",ChannelHandlerContext.class,Packet.class);
-            networkManageRead.setAccessible(true);
-//            packetListener = NetworkManager.class.getDeclaredField("m");
-            for (Field declaredField : NetworkManager.class.getDeclaredFields()) {
-                if (declaredField.getType().equals(PacketListener.class)){
-                    packetListener = declaredField;
-                    packetListener.setAccessible(true);
-                }
+        for (Method method : NetworkManager.class.getDeclaredMethods()) {
+            Class<?>[] types = method.getParameterTypes();
+            if (types.length == 2 && types[0].equals(ChannelHandlerContext.class) && types[1].equals(Packet.class) && method.getReturnType().equals(void.class)){
+                method.setAccessible(true);
+                networkManageRead = method;
+                break;
             }
-        }catch (NoSuchMethodException e){
-            e.printStackTrace();
         }
+        for (Field declaredField : NetworkManager.class.getDeclaredFields()) {
+            if (declaredField.getType().equals(PacketListener.class)){
+                packetListener = declaredField;
+                packetListener.setAccessible(true);
+            }
+        }
+//            networkManageRead = NetworkManager.class.getDeclaredMethod("channelRead0",ChannelHandlerContext.class,Packet.class);
+//            networkManageRead.setAccessible(true);
+//            packetListener = NetworkManager.class.getDeclaredField("m");
     }
 
     private final Set<Integer> cache = Collections.newSetFromMap(new WeakHashMap<>());
@@ -48,7 +52,7 @@ public class PlayerPacketManage {
     public void sendPacket(Player player,Packet<?> packet) {
         if (player.isOnline() && packet != null){
             setPluginPacket(packet);
-            getNetworkManage(player).sendPacket(packet);
+            getNetworkManage(player).a(packet);
         }
     }
 
@@ -84,7 +88,7 @@ public class PlayerPacketManage {
     }
 
     public void recieveClientPacket(NetworkManager networkManager,ChannelHandlerContext ctx,Packet<?> packet) {
-        if (!networkManager.isConnected()) return;
+        if (!networkManager.k.isOpen()) return;
         try{
             networkManager.channelRead(ctx,packet);
         }catch (Exception e){
@@ -94,7 +98,7 @@ public class PlayerPacketManage {
 
     //服务端收包事件
     public void recieveClientPacket(PacketListenerPlayIn networkManager,Packet<PacketListenerPlayIn> packet) {
-        packet.handle(networkManager);
+        packet.a(networkManager);
     }
 
     public NetworkManager getNetworkManage(Channel channel) {
