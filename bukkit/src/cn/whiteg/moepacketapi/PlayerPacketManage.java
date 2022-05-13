@@ -1,6 +1,8 @@
 package cn.whiteg.moepacketapi;
 
 import cn.whiteg.moepacketapi.utils.EntityNetUtils;
+import cn.whiteg.moepacketapi.utils.FieldAccessor;
+import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -10,7 +12,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.PacketListenerPlayIn;
 import net.minecraft.server.level.EntityPlayer;
 import net.minecraft.server.network.PlayerConnection;
-import org.bukkit.craftbukkit.v1_18_R1.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_18_R2.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;
@@ -22,6 +24,7 @@ import java.util.WeakHashMap;
 public class PlayerPacketManage {
     private static Method networkManageRead;
     private static Field packetListener;
+    private static FieldAccessor<Channel> channelField;
 
     static {
         for (Method method : NetworkManager.class.getDeclaredMethods()) {
@@ -37,6 +40,11 @@ public class PlayerPacketManage {
                 packetListener = declaredField;
                 packetListener.setAccessible(true);
             }
+        }
+        try{
+            channelField = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
+        }catch (Exception e){
+            e.printStackTrace();
         }
 //            networkManageRead = NetworkManager.class.getDeclaredMethod("channelRead0",ChannelHandlerContext.class,Packet.class);
 //            networkManageRead.setAccessible(true);
@@ -83,12 +91,12 @@ public class PlayerPacketManage {
         if (networkManager instanceof PacketListenerPlayIn && packet != null){
             recieveClientPacket(((PacketListenerPlayIn) networkManager),((Packet<PacketListenerPlayIn>) packet));
         } else {
-            recieveClientPacket(networkManager,networkManager.k.pipeline().lastContext(),packet);
+            recieveClientPacket(networkManager,getChannel(networkManager).pipeline().lastContext(),packet);
         }
     }
 
     public void recieveClientPacket(NetworkManager networkManager,ChannelHandlerContext ctx,Packet<?> packet) {
-        if (!networkManager.k.isOpen()) return;
+        if (!getChannel(networkManager).isOpen()) return;
         try{
             networkManager.channelRead(ctx,packet);
         }catch (Exception e){
@@ -136,7 +144,11 @@ public class PlayerPacketManage {
     }
 
     public Channel getChannel(Player player) {
-        return getNetworkManage(player).k;
+        return getChannel(getNetworkManage(player));
+    }
+
+    public Channel getChannel(NetworkManager networkManager) {
+        return channelField.get(networkManager);
     }
 
     public Set<Integer> getCache() {

@@ -1,7 +1,9 @@
 package cn.whiteg.moepacketapi.utils;
 
+import com.google.gson.internal.reflect.ReflectionAccessor;
 import org.bukkit.Bukkit;
 
+import javax.naming.RefAddr;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,10 +18,10 @@ import java.util.regex.Pattern;
  */
 public final class ReflectionUtils {
     // Deduce the net.minecraft.server.v* package
-    private static String OBC_PREFIX = Bukkit.getServer().getClass().getPackage().getName();
-    private static String VERSION = OBC_PREFIX.replace("org.bukkit.craftbukkit","").replace(".","");
+    private static final String OBC_PREFIX = Bukkit.getServer().getClass().getPackage().getName();
+    private static final String VERSION = OBC_PREFIX.replace("org.bukkit.craftbukkit","").replace(".","");
     // Variable replacement
-    private static Pattern MATCH_VARIABLE = Pattern.compile("\\{([^\\}]+)\\}");
+    private static final Pattern MATCH_VARIABLE = Pattern.compile("\\{([^\\}]+)\\}");
 
     private ReflectionUtils() {
         // Seal class
@@ -78,35 +80,7 @@ public final class ReflectionUtils {
         for (final Field field : target.getDeclaredFields()) {
             if ((name == null || field.getName().equals(name)) && fieldType.isAssignableFrom(field.getType()) && index-- <= 0){
                 field.setAccessible(true);
-
-                // A function for retrieving a specific field value
-                return new FieldAccessor<T>() {
-
-                    @Override
-                    @SuppressWarnings("unchecked")
-                    public T get(Object target) {
-                        try{
-                            return (T) field.get(target);
-                        }catch (IllegalAccessException e){
-                            throw new RuntimeException("Cannot access reflection.",e);
-                        }
-                    }
-
-                    @Override
-                    public void set(Object target,Object value) {
-                        try{
-                            field.set(target,value);
-                        }catch (IllegalAccessException e){
-                            throw new RuntimeException("Cannot access reflection.",e);
-                        }
-                    }
-
-                    @Override
-                    public boolean hasField(Object target) {
-                        // target instanceof DeclaringClass
-                        return field.getDeclaringClass().isAssignableFrom(target.getClass());
-                    }
-                };
+                return new FieldAccessor<>(field);
             }
         }
 
@@ -332,7 +306,7 @@ public final class ReflectionUtils {
     //根据类型获取Field
     public static <T> FieldAccessor<T> getFieldFormType(Class<?> clazz,Class<T> type) {
         for (Field declaredField : clazz.getDeclaredFields()) {
-            if (declaredField.getType().equals(type)) return makeFieldAccessor(declaredField,type);
+            if (declaredField.getType().equals(type)) return makeFieldAccessor(declaredField);
         }
         throw new RuntimeException(new NoSuchFieldException(type.getName()));
     }
@@ -346,69 +320,26 @@ public final class ReflectionUtils {
     }
 
     //从数组结构中查找Field
-    public static Field getFieldFormStructure(Class<?> clazz,Class<?>[] st,int index) throws NoSuchFieldException {
+    public static Field[] getFieldFormStructure(Class<?> clazz,Class<?>... types) throws NoSuchFieldException {
         var fields = clazz.getDeclaredFields();
-        int end = fields.length - st.length;
-
-        loop:
-        for (int i = 0; i < end; i++) {
-            for (int i1 = 0; i1 < st.length; i1++) {
-                var f1 = fields[i + i1];
-                var aClass = st[i1];
-                if (!f1.getType().equals(aClass)){
-                    continue loop;
+        Field[] result = new Field[types.length];
+        int index = 0;
+        for (Field f : fields) {
+            if (f.getType() == types[index]){
+                result[index] = f;
+                index++;
+                if (index >= types.length){
+                    return result;
                 }
+            } else {
+                index = 0;
             }
-            return fields[i + index];
         }
-        throw new NoSuchFieldException(Arrays.toString(st));
+        throw new NoSuchFieldException(Arrays.toString(types));
     }
 
-    public static <T> FieldAccessor<T> makeFieldAccessor(Field field,Class<T> type) {
-        field.setAccessible(true);
-        return new FieldAccessor<>() {
-            /**
-             * Retrieve the content of a field.
-             *
-             * @param target - the target object, or NULL for a static field.
-             * @return The value of the field.
-             */
-            @Override
-            public T get(Object target) {
-                try{
-                    //noinspection unchecked
-                    return (T) field.get(target);
-                }catch (IllegalAccessException e){
-                    throw new RuntimeException(e);
-                }
-            }
-
-            /**
-             * Set the content of a field.
-             *
-             * @param target - the target object, or NULL for a static field.
-             * @param value  - the new value of the field.
-             */
-            @Override
-            public void set(Object target,Object value) {
-                try{
-                    field.set(target,value);
-                }catch (IllegalAccessException e){
-                    throw new RuntimeException(e);
-                }
-            }
-
-            /**
-             * Determine if the given object has this field.
-             *
-             * @param target - the object to test.
-             * @return TRUE if it does, FALSE otherwise.
-             */
-            @Override
-            public boolean hasField(Object target) {
-                return true;
-            }
-        };
+    public static <T> FieldAccessor<T> makeFieldAccessor(Field field) {
+        return new FieldAccessor<>(field);
     }
 
     /**
@@ -436,36 +367,5 @@ public final class ReflectionUtils {
          * @return The return value, or NULL if is void.
          */
         public Object invoke(Object target,Object... arguments);
-    }
-
-    /**
-     * An interface for retrieving the field content.
-     *
-     * @param <T> - field type.
-     */
-    public interface FieldAccessor<T> {
-        /**
-         * Retrieve the content of a field.
-         *
-         * @param target - the target object, or NULL for a static field.
-         * @return The value of the field.
-         */
-        public T get(Object target);
-
-        /**
-         * Set the content of a field.
-         *
-         * @param target - the target object, or NULL for a static field.
-         * @param value  - the new value of the field.
-         */
-        public void set(Object target,Object value);
-
-        /**
-         * Determine if the given object has this field.
-         *
-         * @param target - the object to test.
-         * @return TRUE if it does, FALSE otherwise.
-         */
-        public boolean hasField(Object target);
     }
 }

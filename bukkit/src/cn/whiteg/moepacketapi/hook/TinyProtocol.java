@@ -3,6 +3,7 @@ package cn.whiteg.moepacketapi.hook;
 import cn.whiteg.moepacketapi.MoePacketAPI;
 import cn.whiteg.moepacketapi.api.event.PacketReceiveEvent;
 import cn.whiteg.moepacketapi.api.event.PacketSendEvent;
+import cn.whiteg.moepacketapi.utils.FieldAccessor;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
 import io.netty.channel.*;
@@ -15,12 +16,10 @@ import net.minecraft.server.network.PlayerConnection;
 import net.minecraft.server.network.ServerConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.event.Listener;
 
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 /**
@@ -33,14 +32,14 @@ import java.util.logging.Level;
 public class TinyProtocol implements IHook {
     // Used in order to lookup a channel
     private static final ReflectionUtils.MethodInvoker getPlayerHandle = ReflectionUtils.getMethod("{obc}.entity.CraftPlayer","getHandle");
-    private static final ReflectionUtils.FieldAccessor<PlayerConnection> getConnection = ReflectionUtils.getFieldFormType(EntityPlayer.class,PlayerConnection.class);
-    private static final ReflectionUtils.FieldAccessor<NetworkManager> getManager = ReflectionUtils.getFieldFormType(PlayerConnection.class,NetworkManager.class);
-    private static final ReflectionUtils.FieldAccessor<Channel> getChannel = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
+    private static final FieldAccessor<PlayerConnection> getConnection = ReflectionUtils.getFieldFormType(EntityPlayer.class,PlayerConnection.class);
+    private static final FieldAccessor<NetworkManager> getManager = ReflectionUtils.getFieldFormType(PlayerConnection.class,NetworkManager.class);
+    private static final FieldAccessor<Channel> getChannel = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
 
     // Looking up ServerConnection
     private static final Class<Object> craftServerClass = ReflectionUtils.getUntypedClass("{obc}.CraftServer");
-    private static final ReflectionUtils.FieldAccessor<DedicatedServer> getMinecraftServer = ReflectionUtils.getFieldFormType(craftServerClass,DedicatedServer.class);
-    private static final ReflectionUtils.FieldAccessor<ServerConnection> getServerConnection = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnection.class);
+    private static final FieldAccessor<DedicatedServer> getMinecraftServer = ReflectionUtils.getFieldFormType(craftServerClass,DedicatedServer.class);
+    private static final FieldAccessor<ServerConnection> getServerConnection = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnection.class);
 
     // Injected channel handlers
     private final List<Channel> serverChannels = Lists.newArrayList();
@@ -119,7 +118,6 @@ public class TinyProtocol implements IHook {
     private void registerChannelHandler() {
         Object mcServer = getMinecraftServer.get(Bukkit.getServer());
         Object serverConnection = getServerConnection.get(mcServer);
-        boolean looking = true;
         try{
             Field f = ReflectionUtils.getFieldFormType(ServerConnection.class,"java.util.List<net.minecraft.network.NetworkManager>");
             f.setAccessible(true);
@@ -129,24 +127,27 @@ public class TinyProtocol implements IHook {
         }
         createServerChannelHandler();
 
-        for (int i = 0; looking; i++) {
-            List<Object> list = ReflectionUtils.getField(serverConnection.getClass(),List.class,i).get(serverConnection);
+        //noinspection InfiniteLoopStatement
+        for (int i = 0; true; i++) {
+            List<Object> list = null;
+            list = ReflectionUtils.getField(serverConnection.getClass(),List.class,i).get(serverConnection);
             for (Object item : list) {
                 if (item instanceof ChannelFuture channelFuture){
                     Channel serverChannel = channelFuture.channel();
                     serverChannels.add(serverChannel);
-                    serverChannel.pipeline().addFirst(serverChannelHandler);
-                    looking = false;
-                } else {
-                    break;
+                    try{
+                        serverChannel.pipeline().addFirst(serverChannelHandler);
+                    }catch (ChannelPipelineException ignored){
+                        //如果不是Sharable会抛出异常
+                    }
                 }
+                break;
             }
         }
     }
 
     private void unregisterChannelHandler() {
-        if (serverChannelHandler == null)
-            return;
+        if (serverChannelHandler == null) return;
 
         for (Channel serverChannel : serverChannels) {
             final ChannelPipeline pipeline = serverChannel.pipeline();

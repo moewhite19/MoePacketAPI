@@ -12,9 +12,9 @@ import org.bukkit.entity.Player;
 import java.lang.reflect.InvocationTargetException;
 
 public class EntityNetUtils {
-    static ReflectionUtils.FieldAccessor<PlayerConnection> entity_counter;
-    static ReflectionUtils.FieldAccessor<NetworkManager> connect_network;
-    static ReflectionUtils.FieldAccessor<Channel> network_channel;
+    static FieldAccessor<PlayerConnection> entity_counter;
+    static FieldAccessor<NetworkManager> connect_network;
+    static FieldAccessor<Channel> network_channel;
 
 
     static {
