@@ -27,6 +27,9 @@ public final class ReflectionUtils {
         // Seal class
     }
 
+    public static <T> FieldAccessor<T> getField(Class<?> target,Class<T> fieldType) {
+        return getField(target,null,fieldType);
+    }
     /**
      * Retrieve a field accessor for a specific field type and name.
      *
@@ -36,49 +39,8 @@ public final class ReflectionUtils {
      * @return The field accessor.
      */
     public static <T> FieldAccessor<T> getField(Class<?> target,String name,Class<T> fieldType) {
-        return getField(target,name,fieldType,0);
-    }
-
-    /**
-     * Retrieve a field accessor for a specific field type and name.
-     *
-     * @param className - lookup name of the class, see {@link #getClass(String)}.
-     * @param name      - the name of the field, or NULL to ignore.
-     * @param fieldType - a compatible field type.
-     * @return The field accessor.
-     */
-    public static <T> FieldAccessor<T> getField(String className,String name,Class<T> fieldType) {
-        return getField(getClass(className),name,fieldType,0);
-    }
-
-    /**
-     * Retrieve a field accessor for a specific field type and name.
-     *
-     * @param target    - the target type.
-     * @param fieldType - a compatible field type.
-     * @param index     - the number of compatible fields to skip.
-     * @return The field accessor.
-     */
-    public static <T> FieldAccessor<T> getField(Class<?> target,Class<T> fieldType,int index) {
-        return getField(target,null,fieldType,index);
-    }
-
-    /**
-     * Retrieve a field accessor for a specific field type and name.
-     *
-     * @param className - lookup name of the class, see {@link #getClass(String)}.
-     * @param fieldType - a compatible field type.
-     * @param index     - the number of compatible fields to skip.
-     * @return The field accessor.
-     */
-    public static <T> FieldAccessor<T> getField(String className,Class<T> fieldType,int index) {
-        return getField(getClass(className),fieldType,index);
-    }
-
-    // Common method
-    private static <T> FieldAccessor<T> getField(Class<?> target,String name,Class<T> fieldType,int index) {
         for (final Field field : target.getDeclaredFields()) {
-            if ((name == null || field.getName().equals(name)) && fieldType.isAssignableFrom(field.getType()) && index-- <= 0){
+            if ((name == null || field.getName().equals(name)) && fieldType.isAssignableFrom(field.getType())){
                 field.setAccessible(true);
                 return new FieldAccessor<>(field);
             }
@@ -86,7 +48,7 @@ public final class ReflectionUtils {
 
         // Search in parent classes
         if (target.getSuperclass() != null)
-            return getField(target.getSuperclass(),name,fieldType,index);
+            return getField(target.getSuperclass(),name,fieldType);
 
         throw new IllegalArgumentException("Cannot find field with type " + fieldType);
     }

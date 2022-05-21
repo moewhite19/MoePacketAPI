@@ -127,21 +127,16 @@ public class TinyProtocol implements IHook {
         }
         createServerChannelHandler();
 
-        //noinspection InfiniteLoopStatement
-        for (int i = 0; true; i++) {
-            List<Object> list = null;
-            list = ReflectionUtils.getField(serverConnection.getClass(),List.class,i).get(serverConnection);
-            for (Object item : list) {
-                if (item instanceof ChannelFuture channelFuture){
-                    Channel serverChannel = channelFuture.channel();
-                    serverChannels.add(serverChannel);
-                    try{
-                        serverChannel.pipeline().addFirst(serverChannelHandler);
-                    }catch (ChannelPipelineException ignored){
-                        //如果不是Sharable会抛出异常
-                    }
-                }
-                break;
+        List<ChannelFuture> list = ReflectionUtils.getField(serverConnection.getClass(),List.class).get(serverConnection);
+        for (ChannelFuture channelFuture : list) {
+            Channel serverChannel = channelFuture.channel();
+            try{
+                serverChannel.pipeline().addFirst(serverChannelHandler);
+                serverChannels.add(serverChannel);
+                plugin.getLogger().info("开始监听" + serverChannel);
+            }catch (ChannelPipelineException ignored){
+                plugin.getLogger().warning("无法监听" + serverChannel);
+                //如果不是Sharable会抛出异常
             }
         }
     }
