@@ -1,9 +1,7 @@
 package cn.whiteg.moepacketapi.utils;
 
-import com.google.gson.internal.reflect.ReflectionAccessor;
 import org.bukkit.Bukkit;
 
-import javax.naming.RefAddr;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -159,22 +157,6 @@ public final class ReflectionUtils {
         }
 
         throw new IllegalStateException(String.format("Unable to find constructor for %s (%s).",clazz,Arrays.asList(params)));
-    }
-
-    /**
-     * Retrieve a class from its full name, without knowing its type on compile time.
-     * <p>
-     * This is useful when looking up fields by a NMS or OBC type.
-     * <p>
-     *
-     * @param lookupName - the class name with variables.
-     * @return The class.
-     * @see {@link #getClass()} for more information.
-     */
-    public static Class<Object> getUntypedClass(String lookupName) {
-        @SuppressWarnings({"rawtypes","unchecked"})
-        Class<Object> clazz = (Class) getClass(lookupName);
-        return clazz;
     }
 
     /**

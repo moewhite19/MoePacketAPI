@@ -10,12 +10,9 @@ import net.minecraft.network.NetworkManager;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.PacketListenerPlayIn;
-import net.minecraft.server.level.EntityPlayer;
 import net.minecraft.server.network.PlayerConnection;
-import org.bukkit.craftbukkit.v1_18_R2.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Set;
@@ -23,7 +20,7 @@ import java.util.WeakHashMap;
 
 public class PlayerPacketManage {
     private static Method networkManageRead;
-    private static Field packetListener;
+    private static FieldAccessor<PacketListener> packetListener;
     private static FieldAccessor<Channel> channelField;
 
     static {
@@ -35,13 +32,9 @@ public class PlayerPacketManage {
                 break;
             }
         }
-        for (Field declaredField : NetworkManager.class.getDeclaredFields()) {
-            if (declaredField.getType().equals(PacketListener.class)){
-                packetListener = declaredField;
-                packetListener.setAccessible(true);
-            }
-        }
+
         try{
+            packetListener = ReflectionUtils.getFieldFormType(NetworkManager.class,PacketListener.class);
             channelField = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
         }catch (Exception e){
             e.printStackTrace();
@@ -116,13 +109,11 @@ public class PlayerPacketManage {
     }
 
     public NetworkManager getNetworkManage(Player player) {
-        EntityPlayer np = ((CraftPlayer) player).getHandle();
-        return EntityNetUtils.getNetWork(EntityNetUtils.getPlayerConnection(np));
+        return EntityNetUtils.getNetWork(EntityNetUtils.getPlayerConnection(EntityNetUtils.getNmsPlayer(player)));
     }
 
     public PlayerConnection getPlayerConnection(Player player) {
-        EntityPlayer np = ((CraftPlayer) player).getHandle();
-        return EntityNetUtils.getPlayerConnection(np);
+        return EntityNetUtils.getPlayerConnection(EntityNetUtils.getNmsPlayer(player));
     }
 
 
@@ -132,13 +123,9 @@ public class PlayerPacketManage {
 
     public Player getPlayer(NetworkManager network) {
         if (network == null) return null;
-        try{
-            PacketListener listener = (PacketListener) packetListener.get(network);
-            if (listener instanceof PlayerConnection){
-                return ((PlayerConnection) listener).b.getBukkitEntity();
-            }
-        }catch (IllegalAccessException e){
-            e.printStackTrace();
+        PacketListener listener = packetListener.get(network);
+        if (listener instanceof PlayerConnection playerConnection){
+            return playerConnection.c.getBukkitEntity();
         }
         return null;
     }

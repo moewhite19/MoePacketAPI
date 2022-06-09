@@ -3,6 +3,7 @@ package cn.whiteg.moepacketapi.hook;
 import cn.whiteg.moepacketapi.MoePacketAPI;
 import cn.whiteg.moepacketapi.api.event.PacketReceiveEvent;
 import cn.whiteg.moepacketapi.api.event.PacketSendEvent;
+import cn.whiteg.moepacketapi.utils.EntityNetUtils;
 import cn.whiteg.moepacketapi.utils.FieldAccessor;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
@@ -30,15 +31,7 @@ import java.util.logging.Level;
  * @author Kristian
  */
 public class TinyProtocol implements IHook {
-    // Used in order to lookup a channel
-    private static final ReflectionUtils.MethodInvoker getPlayerHandle = ReflectionUtils.getMethod("{obc}.entity.CraftPlayer","getHandle");
-    private static final FieldAccessor<PlayerConnection> getConnection = ReflectionUtils.getFieldFormType(EntityPlayer.class,PlayerConnection.class);
-    private static final FieldAccessor<NetworkManager> getManager = ReflectionUtils.getFieldFormType(PlayerConnection.class,NetworkManager.class);
-    private static final FieldAccessor<Channel> getChannel = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
 
-    // Looking up ServerConnection
-    private static final Class<Object> craftServerClass = ReflectionUtils.getUntypedClass("{obc}.CraftServer");
-    private static final FieldAccessor<DedicatedServer> getMinecraftServer = ReflectionUtils.getFieldFormType(craftServerClass,DedicatedServer.class);
     private static final FieldAccessor<ServerConnection> getServerConnection = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnection.class);
 
     // Injected channel handlers
@@ -116,7 +109,7 @@ public class TinyProtocol implements IHook {
 
     @SuppressWarnings("unchecked")
     private void registerChannelHandler() {
-        Object mcServer = getMinecraftServer.get(Bukkit.getServer());
+        Object mcServer = EntityNetUtils.getNmsServer();
         Object serverConnection = getServerConnection.get(mcServer);
         try{
             Field f = ReflectionUtils.getFieldFormType(ServerConnection.class,"java.util.List<net.minecraft.network.NetworkManager>");
@@ -204,10 +197,8 @@ public class TinyProtocol implements IHook {
      * @return The Netty channel.
      */
     public Channel getChannel(Player player) {
-        // Lookup channel again
-        Object connection = getConnection.get(getPlayerHandle.invoke(player));
-        Object manager = getManager.get(connection);
-        return getChannel.get(manager);
+        //超级套娃
+        return EntityNetUtils.getChannel(EntityNetUtils.getNetWork(EntityNetUtils.getPlayerConnection(EntityNetUtils.getNmsPlayer(player))));
     }
 
 
