@@ -28,6 +28,7 @@ public final class ReflectionUtils {
     public static <T> FieldAccessor<T> getField(Class<?> target,Class<T> fieldType) {
         return getField(target,null,fieldType);
     }
+
     /**
      * Retrieve a field accessor for a specific field type and name.
      *
@@ -60,7 +61,7 @@ public final class ReflectionUtils {
      * @return An object that invokes this specific method.
      * @throws IllegalStateException If we cannot find this method.
      */
-    public static MethodInvoker getMethod(String className,String methodName,Class<?>... params) {
+    public static <RT> MethodInvoker<RT> getMethod(String className,String methodName,Class<?>... params) {
         return getTypedMethod(getClass(className),methodName,null,params);
     }
 
@@ -73,7 +74,7 @@ public final class ReflectionUtils {
      * @return An object that invokes this specific method.
      * @throws IllegalStateException If we cannot find this method.
      */
-    public static MethodInvoker getMethod(Class<?> clazz,String methodName,Class<?>... params) {
+    public static <RT> MethodInvoker<RT> getMethod(Class<?> clazz,String methodName,Class<?>... params) {
         return getTypedMethod(clazz,methodName,null,params);
     }
 
@@ -87,25 +88,14 @@ public final class ReflectionUtils {
      * @return An object that invokes this specific method.
      * @throws IllegalStateException If we cannot find this method.
      */
-    public static MethodInvoker getTypedMethod(Class<?> clazz,String methodName,Class<?> returnType,Class<?>... params) {
+    public static <RT> MethodInvoker<RT> getTypedMethod(Class<?> clazz,String methodName,Class<RT> returnType,Class<?>... params) {
         for (final Method method : clazz.getDeclaredMethods()) {
             if ((methodName == null || method.getName().equals(methodName))
                     && (returnType == null || method.getReturnType().equals(returnType))
                     && Arrays.equals(method.getParameterTypes(),params)){
                 method.setAccessible(true);
 
-                return new MethodInvoker() {
-
-                    @Override
-                    public Object invoke(Object target,Object... arguments) {
-                        try{
-                            return method.invoke(target,arguments);
-                        }catch (Exception e){
-                            throw new RuntimeException("Cannot invoke method " + method,e);
-                        }
-                    }
-
-                };
+                return new MethodInvoker<>(method);
             }
         }
 
@@ -250,7 +240,7 @@ public final class ReflectionUtils {
     //根据类型获取Field
     public static <T> FieldAccessor<T> getFieldFormType(Class<?> clazz,Class<T> type) {
         for (Field declaredField : clazz.getDeclaredFields()) {
-            if (declaredField.getType().equals(type)) return makeFieldAccessor(declaredField);
+            if (declaredField.getType().equals(type)) return (FieldAccessor<T>) makeFieldAccessor(declaredField);
         }
         throw new RuntimeException(new NoSuchFieldException(type.getName()));
     }
@@ -282,7 +272,7 @@ public final class ReflectionUtils {
         throw new NoSuchFieldException(Arrays.toString(types));
     }
 
-    public static <T> FieldAccessor<T> makeFieldAccessor(Field field) {
+    public static FieldAccessor<?> makeFieldAccessor(Field field) {
         return new FieldAccessor<>(field);
     }
 
@@ -297,19 +287,5 @@ public final class ReflectionUtils {
          * @return The constructed object.
          */
         public Object invoke(Object... arguments);
-    }
-
-    /**
-     * An interface for invoking a specific method.
-     */
-    public interface MethodInvoker {
-        /**
-         * Invoke a method on a specific target object.
-         *
-         * @param target    - the target object, or NULL for a static method.
-         * @param arguments - the arguments to pass to the method.
-         * @return The return value, or NULL if is void.
-         */
-        public Object invoke(Object target,Object... arguments);
     }
 }

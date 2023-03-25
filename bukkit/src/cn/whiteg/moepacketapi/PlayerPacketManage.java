@@ -10,32 +10,24 @@ import net.minecraft.network.NetworkManager;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.PacketListenerPlayIn;
+import net.minecraft.server.level.EntityPlayer;
 import net.minecraft.server.network.PlayerConnection;
 import org.bukkit.entity.Player;
 
-import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
 public class PlayerPacketManage {
-    private static Method networkManageRead;
-    private static FieldAccessor<PacketListener> packetListener;
-    private static FieldAccessor<Channel> channelField;
+    private static FieldAccessor<PacketListener> newtworkPacketListener;
+    private static FieldAccessor<Channel> networkChannel;
+    private static FieldAccessor<EntityPlayer> connectionEntityPlayer;
 
     static {
-        for (Method method : NetworkManager.class.getDeclaredMethods()) {
-            Class<?>[] types = method.getParameterTypes();
-            if (types.length == 2 && types[0].equals(ChannelHandlerContext.class) && types[1].equals(Packet.class) && method.getReturnType().equals(void.class)){
-                method.setAccessible(true);
-                networkManageRead = method;
-                break;
-            }
-        }
-
         try{
-            packetListener = ReflectionUtils.getFieldFormType(NetworkManager.class,PacketListener.class);
-            channelField = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
+            newtworkPacketListener = ReflectionUtils.getFieldFormType(NetworkManager.class,PacketListener.class);
+            networkChannel = ReflectionUtils.getFieldFormType(NetworkManager.class,Channel.class);
+            connectionEntityPlayer = ReflectionUtils.getFieldFormType(PlayerConnection.class,EntityPlayer.class);
         }catch (Exception e){
             e.printStackTrace();
         }
@@ -78,11 +70,10 @@ public class PlayerPacketManage {
         if (network == null) return;
         recieveClientPacket(network,(packet));
     }
-
-    //服务端收包事件
+    
     public void recieveClientPacket(NetworkManager networkManager,Packet<?> packet) {
-        if (networkManager instanceof PacketListenerPlayIn && packet != null){
-            recieveClientPacket(((PacketListenerPlayIn) networkManager),((Packet<PacketListenerPlayIn>) packet));
+        if (newtworkPacketListener.get(networkManager) instanceof PacketListenerPlayIn listenerPlayIn && packet != null){
+            recieveClientPacket(listenerPlayIn,((Packet<PacketListenerPlayIn>) packet));
         } else {
             recieveClientPacket(networkManager,getChannel(networkManager).pipeline().lastContext(),packet);
         }
@@ -123,9 +114,9 @@ public class PlayerPacketManage {
 
     public Player getPlayer(NetworkManager network) {
         if (network == null) return null;
-        PacketListener listener = packetListener.get(network);
+        PacketListener listener = newtworkPacketListener.get(network);
         if (listener instanceof PlayerConnection playerConnection){
-            return playerConnection.c.getBukkitEntity();
+            return connectionEntityPlayer.get(playerConnection).getBukkitEntity();
         }
         return null;
     }
@@ -135,7 +126,7 @@ public class PlayerPacketManage {
     }
 
     public Channel getChannel(NetworkManager networkManager) {
-        return channelField.get(networkManager);
+        return networkChannel.get(networkManager);
     }
 
     public Set<Integer> getCache() {
