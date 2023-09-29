@@ -11,14 +11,9 @@ import io.netty.channel.*;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.dedicated.DedicatedServer;
-import net.minecraft.server.level.EntityPlayer;
-import net.minecraft.server.network.PlayerConnection;
 import net.minecraft.server.network.ServerConnection;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.logging.Level;
@@ -32,7 +27,15 @@ import java.util.logging.Level;
  */
 public class TinyProtocol implements IHook {
 
-    private static final FieldAccessor<ServerConnection> getServerConnection = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnection.class);
+    private static final FieldAccessor<ServerConnection> getServerConnection;
+
+    static {
+        try{
+            getServerConnection = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnection.class);
+        }catch (NoSuchFieldException e){
+            throw new RuntimeException(e);
+        }
+    }
 
     // Injected channel handlers
     private final List<Channel> serverChannels = Lists.newArrayList();
@@ -112,11 +115,11 @@ public class TinyProtocol implements IHook {
         Object mcServer = EntityNetUtils.getNmsServer();
         Object serverConnection = getServerConnection.get(mcServer);
         try{
-            Field f = ReflectionUtils.getFieldFormType(ServerConnection.class,"java.util.List<net.minecraft.network.NetworkManager>");
-            f.setAccessible(true);
+            FieldAccessor<NetworkManager> f = (FieldAccessor<NetworkManager>) ReflectionUtils.getFieldFormType(ServerConnection.class,ReflectionUtils.markGenericTypes(List.class,NetworkManager.class));
             networkManagers = (List<Object>) f.get(serverConnection);
-        }catch (IllegalAccessException e){
+        }catch (NoSuchFieldException e){
             e.printStackTrace();
+            return;
         }
         createServerChannelHandler();
 
