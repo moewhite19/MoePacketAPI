@@ -4,7 +4,7 @@ import cn.whiteg.moepacketapi.MoePacketAPI;
 import cn.whiteg.moepacketapi.hook.PlayerPacketHook;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.network.NetworkManager;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -55,11 +55,11 @@ public class PacketEvent extends Event implements Cancellable {
         return player;
     }
 
-    public NetworkManager getNetworkManage() {
-        NetworkManager network = handel.getNetworkManager();
+    public Connection getNetworkManage() {
+        Connection network = handel.getConnection();
         if (network == null){
             network = MoePacketAPI.getInstance().getPlayerPacketManage().getNetworkManage(getChannel());
-            handel.setNetworkManager(network);
+            handel.setConnection(network);
         }
         return network;
     }

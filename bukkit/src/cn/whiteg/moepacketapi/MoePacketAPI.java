@@ -7,7 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class MoePacketAPI extends JavaPlugin {
     private static MoePacketAPI instance;
     final private PlayerPacketManage playerPacketManage;
-    private TinyProtocol hook;
+    private IHook hook;
     private Setting setting;
 
     public MoePacketAPI() {

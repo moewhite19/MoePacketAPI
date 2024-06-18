@@ -1,6 +1,6 @@
 package cn.whiteg.moepacketapi.hook;
 
-import net.minecraft.network.NetworkManager;
+import net.minecraft.network.Connection;
 import org.bukkit.entity.Player;
 
 public interface PlayerPacketHook {
@@ -8,7 +8,7 @@ public interface PlayerPacketHook {
 
     void setPlayer(Player player);
 
-    NetworkManager getNetworkManager();
+    Connection getConnection();
 
-    void setNetworkManager(NetworkManager networkManager);
+    void setConnection(Connection networkManager);
 }

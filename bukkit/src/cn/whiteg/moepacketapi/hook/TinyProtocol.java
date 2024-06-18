@@ -8,14 +8,17 @@ import cn.whiteg.moepacketapi.utils.FieldAccessor;
 import cn.whiteg.moepacketapi.utils.ReflectionUtils;
 import com.google.common.collect.Lists;
 import io.netty.channel.*;
-import net.minecraft.network.NetworkManager;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerConnection;
+import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.network.ServerConnectionListener;
+import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
 import java.util.logging.Level;
 
 /**
@@ -27,24 +30,24 @@ import java.util.logging.Level;
  */
 public class TinyProtocol implements IHook {
 
-    private static final FieldAccessor<ServerConnection> getServerConnection;
+    private static final FieldAccessor<ServerConnectionListener> getServerConnectionField;
 
     static {
         try{
-            getServerConnection = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnection.class);
+            getServerConnectionField = ReflectionUtils.getFieldFormType(MinecraftServer.class,ServerConnectionListener.class);
         }catch (NoSuchFieldException e){
             throw new RuntimeException(e);
         }
     }
 
     // Injected channel handlers
-    private final List<Channel> serverChannels = Lists.newArrayList();
+    private final List<Channel> hookedServerChannels = Lists.newArrayList();
     // Current handler name
     private final String handlerName;
     protected volatile boolean closed;
     protected MoePacketAPI plugin;
     // List of network markers
-    private List<Object> networkManagers;
+    private List<Object> connections;
     private ChannelInboundHandlerAdapter serverChannelHandler;
     private ChannelInitializer<Channel> beginInitProtocol;
     private ChannelInitializer<Channel> endInitProtocol;
@@ -62,6 +65,7 @@ public class TinyProtocol implements IHook {
         // Compute handler name
         this.handlerName = "tiny-" + plugin.getName();
         try{
+            createServerChannelHandler();
             registerChannelHandler();
         }catch (IllegalArgumentException ex){
             // Damn you, late bind
@@ -73,24 +77,27 @@ public class TinyProtocol implements IHook {
 
     private void createServerChannelHandler() {
         // Handle connected channels
-        endInitProtocol = new ChannelInitializer<Channel>() {
+        endInitProtocol = new ChannelInitializer<>() {
             @SuppressWarnings("SynchronizeOnNonFinalField")
             @Override
-            protected void initChannel(Channel channel) throws Exception {
+            protected void initChannel(Channel channel) {
                 try{
                     // This can take a while, so we need to stop the main thread from interfering
-                    synchronized (networkManagers) {
+                    synchronized (connections) {
                         // Stop injecting channels
                         if (!closed){
-                            channel.eventLoop().submit(() -> injectChannelInternal(channel));
+                            channel.eventLoop().submit(new Callable<PacketInterceptor>() {
+                                @Override
+                                public PacketInterceptor call() throws Exception {
+                                    return injectChannelInternal(channel);
+                                }
+                            });
                         }
                     }
                 }catch (Exception e){
                     plugin.getLogger().log(Level.SEVERE,"Cannot inject incomming channel " + channel,e);
                 }
             }
-
-
         };
         // This is executed before Minecraft's channel handler
         beginInitProtocol = new ChannelInitializer<Channel>() {
@@ -112,23 +119,25 @@ public class TinyProtocol implements IHook {
 
     @SuppressWarnings("unchecked")
     private void registerChannelHandler() {
-        Object mcServer = EntityNetUtils.getNmsServer();
-        Object serverConnection = getServerConnection.get(mcServer);
+        DedicatedServer mcServer = EntityNetUtils.getNmsServer();
+        ServerConnectionListener serverConnection = getServerConnectionField.get(mcServer);
+        List<ChannelFuture> channels;
         try{
-            FieldAccessor<NetworkManager> f = (FieldAccessor<NetworkManager>) ReflectionUtils.getFieldFormType(ServerConnection.class,ReflectionUtils.markGenericTypes(List.class,NetworkManager.class));
-            networkManagers = (List<Object>) f.get(serverConnection);
+            FieldAccessor<Connection> connectionsField = (FieldAccessor<Connection>) ReflectionUtils.getFieldFormType(ServerConnectionListener.class,ReflectionUtils.markGenericTypes(List.class,Connection.class));
+            connections = (List<Object>) connectionsField.get(serverConnection);
+
+            channels = (List<ChannelFuture>) ReflectionUtils.getFieldFormType(serverConnection.getClass(),ReflectionUtils.markGenericTypes(List.class,ChannelFuture.class)).get(serverConnection);
         }catch (NoSuchFieldException e){
             e.printStackTrace();
             return;
         }
-        createServerChannelHandler();
 
-        List<ChannelFuture> list = ReflectionUtils.getField(serverConnection.getClass(),List.class).get(serverConnection);
-        for (ChannelFuture channelFuture : list) {
+
+        for (ChannelFuture channelFuture : channels) {
             Channel serverChannel = channelFuture.channel();
             try{
                 serverChannel.pipeline().addFirst(serverChannelHandler);
-                serverChannels.add(serverChannel);
+                hookedServerChannels.add(serverChannel);
                 plugin.getLogger().info("开始监听" + serverChannel);
             }catch (ChannelPipelineException ignored){
                 plugin.getLogger().warning("无法监听" + serverChannel);
@@ -140,7 +149,7 @@ public class TinyProtocol implements IHook {
     private void unregisterChannelHandler() {
         if (serverChannelHandler == null) return;
 
-        for (Channel serverChannel : serverChannels) {
+        for (Channel serverChannel : hookedServerChannels) {
             final ChannelPipeline pipeline = serverChannel.pipeline();
 
             // Remove channel handler
@@ -154,7 +163,6 @@ public class TinyProtocol implements IHook {
                         // That's fine
                     }
                 }
-
             });
         }
     }
@@ -185,6 +193,8 @@ public class TinyProtocol implements IHook {
             if (interceptor == null){
                 interceptor = new PacketInterceptor();
                 channel.pipeline().addBefore("packet_handler",handlerName,interceptor);
+//                final List<String> names = channel.pipeline().names();
+//                System.out.println("可用pipeline: " + names);
             }
             return interceptor;
         }catch (IllegalArgumentException e){
@@ -243,20 +253,31 @@ public class TinyProtocol implements IHook {
      */
     public static class PacketInterceptor extends ChannelDuplexHandler implements PlayerPacketHook {
         Player player = null;
-        NetworkManager networkManager = null;
+        Connection networkManager = null;
 
         @Override
         public void channelRead(ChannelHandlerContext ctx,Object msg) throws Exception {
-            PacketReceiveEvent event = new PacketReceiveEvent((Packet<?>) msg,ctx,this);
-            if (!event.callEvent()) return;
-            super.channelRead(ctx,event.getPacket());
+            if (msg instanceof Packet<?> packet){
+                PacketReceiveEvent event = new PacketReceiveEvent(packet,ctx,this);
+                if (!event.callEvent()) return;
+                super.channelRead(ctx,event.getPacket());
+            } else {
+//                MoePacketAPI.getInstance().getLogger().warning("收到未知包: " + msg.toString());
+                super.channelRead(ctx,msg);
+            }
         }
 
         @Override
         public void write(ChannelHandlerContext ctx,Object msg,ChannelPromise promise) throws Exception {
-            PacketSendEvent event = new PacketSendEvent((Packet<?>) msg,ctx,this);
-            if (!event.callEvent()) return;
-            super.write(ctx,event.getPacket(),promise);
+            if (msg instanceof Packet<?> packet){
+                PacketSendEvent event;
+                event = new PacketSendEvent(packet,ctx,this);
+                if (!event.callEvent()) return;
+                super.write(ctx,event.getPacket(),promise);
+            } else {
+//                MoePacketAPI.getInstance().getLogger().warning("发送未知包: " + msg.toString());
+                super.write(ctx,msg,promise);
+            }
         }
 
         @Override
@@ -270,12 +291,12 @@ public class TinyProtocol implements IHook {
         }
 
         @Override
-        public NetworkManager getNetworkManager() {
+        public Connection getConnection() {
             return networkManager;
         }
 
         @Override
-        public void setNetworkManager(NetworkManager networkManager) {
+        public void setConnection(Connection networkManager) {
             this.networkManager = networkManager;
         }
     }
